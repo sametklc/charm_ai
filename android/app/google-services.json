@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "84771592082",
+    "project_id": "charmai-39863",
+    "storage_bucket": "charmai-39863.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:84771592082:android:ee536acf7be91f5d4f534b",
+        "android_client_info": {
+          "package_name": "com.example.charm_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9WxkBc3SjdpmpBYLRo0Pnf7eQjBZ1uR4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:84771592082:android:18954e4e192e1d8b4f534b",
+        "android_client_info": {
+          "package_name": "com.skapps.charmAI"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9WxkBc3SjdpmpBYLRo0Pnf7eQjBZ1uR4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

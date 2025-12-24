@@ -1,0 +1,22 @@
+# Render Blueprint Configuration
+# ================================
+# This file helps configure your service on Render
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: charm-ai-backend
+    env: python
+    region: oregon  # Choose closest to your users
+    plan: free      # Start with free tier
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: REPLICATE_API_TOKEN
+        sync: false  # Set manually in Render dashboard
+    healthCheckPath: /health
+
