@@ -5,17 +5,21 @@ import '../entities/message_entity.dart';
 /// Chat Repository Interface
 abstract class ChatRepository {
   /// Send a message and get AI response
+  /// [systemPrompt] is the character's personality prompt for the AI
   Future<Either<Failure, MessageEntity>> sendMessage({
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   });
 
   /// Send message with streaming response
+  /// [systemPrompt] is the character's personality prompt for the AI
   Stream<Either<Failure, String>> sendMessageStream({
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   });
 
   /// Save conversation to Firestore
@@ -27,10 +31,20 @@ abstract class ChatRepository {
   /// Get all conversations for a user
   Future<Either<Failure, List<ConversationEntity>>> getUserConversations(String userId);
 
+  /// Get conversations for a user with a specific character
+  Future<Either<Failure, List<ConversationEntity>>> getUserCharacterConversations(
+    String userId,
+    String characterId,
+  );
+
   /// Delete conversation
   Future<Either<Failure, void>> deleteConversation(String conversationId);
 
-  /// Create new conversation
-  Future<Either<Failure, ConversationEntity>> createConversation(String userId);
+  /// Create new conversation with a character
+  Future<Either<Failure, ConversationEntity>> createConversation({
+    required String userId,
+    required String characterId,
+    String? title,
+  });
 }
 

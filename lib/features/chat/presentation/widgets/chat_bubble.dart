@@ -4,15 +4,17 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/helpers.dart';
 import '../../domain/entities/message_entity.dart';
 
-/// Chat message bubble widget
+/// Chat message bubble widget - WhatsApp style
 class ChatBubble extends StatelessWidget {
   final MessageEntity message;
   final bool showTimestamp;
+  final String? characterAvatar;
 
   const ChatBubble({
     super.key,
     required this.message,
     this.showTimestamp = true,
+    this.characterAvatar,
   });
 
   @override
@@ -36,7 +38,7 @@ class ChatBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: message.isError
-                    ? AppColors.error.withValues(alpha: 0.1)
+                    ? AppColors.error.withOpacity(0.1)
                     : isUser
                         ? AppColors.primary
                         : (isDark ? AppColors.aiBubbleDark : AppColors.aiBubble),
@@ -48,7 +50,7 @@ class ChatBubble extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
@@ -210,7 +212,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      listenable: _controller,
       builder: (context, child) {
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -224,7 +226,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
               width: 6,
               height: 6,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.3 + (opacity * 0.7)),
+                color: AppColors.primary.withOpacity(0.3 + (opacity * 0.7)),
                 shape: BoxShape.circle,
               ),
             );
@@ -262,3 +264,18 @@ class LoadingBubble extends StatelessWidget {
   }
 }
 
+/// AnimatedBuilder helper widget
+class AnimatedBuilder extends AnimatedWidget {
+  final Widget Function(BuildContext, Widget?) builder;
+
+  const AnimatedBuilder({
+    super.key,
+    required Listenable listenable,
+    required this.builder,
+  }) : super(listenable: listenable);
+
+  @override
+  Widget build(BuildContext context) {
+    return builder(context, null);
+  }
+}

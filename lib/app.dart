@@ -5,7 +5,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
-import 'shared/screens/home_screen.dart';
+import 'features/characters/presentation/screens/character_selection_screen.dart';
 
 class CharmApp extends ConsumerWidget {
   const CharmApp({super.key});
@@ -35,7 +35,8 @@ class AuthWrapper extends ConsumerWidget {
     return authState.when(
       data: (user) {
         if (user != null) {
-          return const HomeScreen();
+          // After login -> Navigate to Character Selection
+          return const CharacterSelectionScreen();
         }
         return const LoginScreen();
       },
@@ -59,7 +60,7 @@ class _SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
+            // Logo with heart
             Container(
               width: 100,
               height: 100,
@@ -68,14 +69,14 @@ class _SplashScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: AppColors.primary.withOpacity(0.3),
                     blurRadius: 30,
                     offset: const Offset(0, 15),
                   ),
                 ],
               ),
               child: const Icon(
-                Icons.auto_awesome,
+                Icons.favorite,
                 color: Colors.white,
                 size: 50,
               ),
@@ -87,6 +88,14 @@ class _SplashScreen extends StatelessWidget {
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Find your perfect companion',
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 40),

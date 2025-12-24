@@ -4,7 +4,7 @@ class ApiConstants {
 
   /// Base URL for the backend server (Render)
   /// Update this with your actual Render deployment URL
-  static const String baseUrl = 'https://your-render-app.onrender.com';
+  static const String baseUrl = 'https://charm-ai-locn.onrender.com';
 
   /// Development base URL (for local testing)
   static const String devBaseUrl = 'http://localhost:8000';

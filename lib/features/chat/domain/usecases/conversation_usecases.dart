@@ -3,17 +3,28 @@ import '../../../../core/errors/failures.dart';
 import '../entities/message_entity.dart';
 import '../repositories/chat_repository.dart';
 
-/// Use case for creating a new conversation
+/// Use case for creating a new conversation with a character
 class CreateConversationUseCase {
   final ChatRepository repository;
 
   CreateConversationUseCase(this.repository);
 
-  Future<Either<Failure, ConversationEntity>> call(String userId) async {
+  Future<Either<Failure, ConversationEntity>> call({
+    required String userId,
+    required String characterId,
+    String? title,
+  }) async {
     if (userId.isEmpty) {
       return const Left(ValidationFailure(message: 'User ID is required'));
     }
-    return await repository.createConversation(userId);
+    if (characterId.isEmpty) {
+      return const Left(ValidationFailure(message: 'Character ID is required'));
+    }
+    return await repository.createConversation(
+      userId: userId,
+      characterId: characterId,
+      title: title,
+    );
   }
 }
 
@@ -28,6 +39,26 @@ class GetConversationsUseCase {
       return const Left(ValidationFailure(message: 'User ID is required'));
     }
     return await repository.getUserConversations(userId);
+  }
+}
+
+/// Use case for getting user conversations with a specific character
+class GetCharacterConversationsUseCase {
+  final ChatRepository repository;
+
+  GetCharacterConversationsUseCase(this.repository);
+
+  Future<Either<Failure, List<ConversationEntity>>> call({
+    required String userId,
+    required String characterId,
+  }) async {
+    if (userId.isEmpty) {
+      return const Left(ValidationFailure(message: 'User ID is required'));
+    }
+    if (characterId.isEmpty) {
+      return const Left(ValidationFailure(message: 'Character ID is required'));
+    }
+    return await repository.getUserCharacterConversations(userId, characterId);
   }
 }
 

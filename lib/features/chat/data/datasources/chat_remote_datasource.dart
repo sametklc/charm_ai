@@ -11,15 +11,19 @@ import '../models/message_model.dart';
 /// Chat Remote Data Source Interface
 abstract class ChatRemoteDataSource {
   /// Send message to AI and get response
+  /// [systemPrompt] is used for character personality
   Future<MessageModel> sendMessage({
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   });
 
   /// Send message and get streaming response
+  /// [systemPrompt] is used for character personality
   Stream<String> sendMessageStream({
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   });
 
   /// Save conversation to Firestore
@@ -30,6 +34,12 @@ abstract class ChatRemoteDataSource {
 
   /// Get all conversations for user
   Future<List<ConversationModel>> getUserConversations(String userId);
+
+  /// Get conversations for user with a specific character
+  Future<List<ConversationModel>> getUserCharacterConversations(
+    String userId,
+    String characterId,
+  );
 
   /// Delete conversation
   Future<void> deleteConversation(String conversationId);
@@ -59,20 +69,34 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   Future<MessageModel> sendMessage({
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) async {
     try {
-      // Prepare messages for API
-      final messages = history.map((m) => MessageModel.fromEntity(m).toJson()).toList();
+      // Prepare conversation history (excluding system messages)
+      final messages = <Map<String, dynamic>>[];
+      messages.addAll(
+        history
+            .where((m) => !m.isSystem) // Skip system messages
+            .map((m) => MessageModel.fromEntity(m).toJson()),
+      );
       messages.add({'role': 'user', 'content': message});
+
+      // Build request body
+      final requestBody = <String, dynamic>{
+        'messages': messages,
+        'max_tokens': 500, // Keep responses concise
+        'temperature': 0.9, // Higher for more personality
+      };
+      
+      // Add system prompt for character personality (sent separately to backend)
+      if (systemPrompt != null && systemPrompt.isNotEmpty) {
+        requestBody['system_prompt'] = systemPrompt;
+      }
 
       // Call backend API
       final response = await _dio.post(
         ApiConstants.chat,
-        data: {
-          'messages': messages,
-          'max_tokens': 1000,
-          'temperature': 0.7,
-        },
+        data: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -106,20 +130,34 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   Stream<String> sendMessageStream({
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) async* {
     try {
-      // Prepare messages for API
-      final messages = history.map((m) => MessageModel.fromEntity(m).toJson()).toList();
+      // Prepare conversation history (excluding system messages)
+      final messages = <Map<String, dynamic>>[];
+      messages.addAll(
+        history
+            .where((m) => !m.isSystem) // Skip system messages
+            .map((m) => MessageModel.fromEntity(m).toJson()),
+      );
       messages.add({'role': 'user', 'content': message});
+
+      // Build request body
+      final requestBody = <String, dynamic>{
+        'messages': messages,
+        'max_tokens': 500, // Keep responses concise
+        'temperature': 0.9, // Higher for more personality
+      };
+      
+      // Add system prompt for character personality
+      if (systemPrompt != null && systemPrompt.isNotEmpty) {
+        requestBody['system_prompt'] = systemPrompt;
+      }
 
       // Call streaming endpoint
       final response = await _dio.post(
         '${ApiConstants.chat}/stream',
-        data: {
-          'messages': messages,
-          'max_tokens': 1000,
-          'temperature': 0.7,
-        },
+        data: requestBody,
         options: Options(
           responseType: ResponseType.stream,
           headers: {
@@ -209,6 +247,27 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
           .toList();
     } catch (e) {
       throw ServerException(message: 'Failed to get conversations');
+    }
+  }
+
+  @override
+  Future<List<ConversationModel>> getUserCharacterConversations(
+    String userId,
+    String characterId,
+  ) async {
+    try {
+      final query = await _chatsCollection
+          .where('userId', isEqualTo: userId)
+          .where('characterId', isEqualTo: characterId)
+          .orderBy('updatedAt', descending: true)
+          .limit(50)
+          .get();
+
+      return query.docs
+          .map((doc) => ConversationModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      throw ServerException(message: 'Failed to get character conversations');
     }
   }
 

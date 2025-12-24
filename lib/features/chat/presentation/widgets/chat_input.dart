@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
-/// Chat input widget with text field and send button
+/// Chat input widget with text field, camera button, and send button
 class ChatInput extends StatefulWidget {
   final Function(String) onSend;
+  final VoidCallback? onRequestSelfie;
   final bool isLoading;
+  final bool isSelfieLoading;
   final bool enabled;
+  final String? hintText;
 
   const ChatInput({
     super.key,
     required this.onSend,
+    this.onRequestSelfie,
     this.isLoading = false,
+    this.isSelfieLoading = false,
     this.enabled = true,
+    this.hintText,
   });
 
   @override
@@ -53,9 +59,15 @@ class _ChatInputState extends State<ChatInput> {
     _focusNode.requestFocus();
   }
 
+  void _handleSelfieRequest() {
+    if (widget.isLoading || widget.isSelfieLoading || !widget.enabled) return;
+    widget.onRequestSelfie?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final anyLoading = widget.isLoading || widget.isSelfieLoading;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -63,7 +75,7 @@ class _ChatInputState extends State<ChatInput> {
         color: isDark ? AppColors.surfaceDark : AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -74,6 +86,45 @@ class _ChatInputState extends State<ChatInput> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // Camera/Selfie Button
+            if (widget.onRequestSelfie != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Material(
+                  color: widget.isSelfieLoading
+                      ? AppColors.secondary
+                      : (isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant),
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    onTap: !anyLoading && widget.enabled ? _handleSelfieRequest : null,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      child: widget.isSelfieLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Icon(
+                              Icons.camera_alt_rounded,
+                              color: widget.enabled && !anyLoading
+                                  ? AppColors.secondary
+                                  : (isDark
+                                      ? AppColors.textTertiaryDark
+                                      : AppColors.textTertiary),
+                              size: 24,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+              
             // Text Field
             Expanded(
               child: Container(
@@ -85,7 +136,7 @@ class _ChatInputState extends State<ChatInput> {
                 child: TextField(
                   controller: _controller,
                   focusNode: _focusNode,
-                  enabled: widget.enabled,
+                  enabled: widget.enabled && !anyLoading,
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.newline,
@@ -94,7 +145,7 @@ class _ChatInputState extends State<ChatInput> {
                     fontSize: 16,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Type a message...',
+                    hintText: widget.hintText ?? 'Type a message...',
                     hintStyle: TextStyle(
                       color: isDark ? AppColors.textTertiaryDark : AppColors.textTertiary,
                     ),
@@ -114,12 +165,12 @@ class _ChatInputState extends State<ChatInput> {
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
               child: Material(
-                color: _hasText && widget.enabled && !widget.isLoading
+                color: _hasText && widget.enabled && !anyLoading
                     ? AppColors.primary
                     : (isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant),
                 borderRadius: BorderRadius.circular(24),
                 child: InkWell(
-                  onTap: _hasText && widget.enabled && !widget.isLoading
+                  onTap: _hasText && widget.enabled && !anyLoading
                       ? _handleSend
                       : null,
                   borderRadius: BorderRadius.circular(24),
@@ -140,7 +191,7 @@ class _ChatInputState extends State<ChatInput> {
                           )
                         : Icon(
                             Icons.send_rounded,
-                            color: _hasText && widget.enabled
+                            color: _hasText && widget.enabled && !anyLoading
                                 ? Colors.white
                                 : (isDark
                                     ? AppColors.textTertiaryDark
@@ -157,4 +208,3 @@ class _ChatInputState extends State<ChatInput> {
     );
   }
 }
-

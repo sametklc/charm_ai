@@ -9,10 +9,12 @@ class SendMessageUseCase {
 
   SendMessageUseCase(this.repository);
 
+  /// Send message with optional system prompt for character personality
   Future<Either<Failure, MessageEntity>> call({
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) async {
     // Validate message
     if (message.trim().isEmpty) {
@@ -27,6 +29,7 @@ class SendMessageUseCase {
       conversationId: conversationId,
       message: message.trim(),
       history: history,
+      systemPrompt: systemPrompt,
     );
   }
 }
@@ -37,10 +40,12 @@ class SendMessageStreamUseCase {
 
   SendMessageStreamUseCase(this.repository);
 
+  /// Send message with streaming and optional system prompt for character personality
   Stream<Either<Failure, String>> call({
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) {
     // Validate message
     if (message.trim().isEmpty) {
@@ -51,6 +56,7 @@ class SendMessageStreamUseCase {
       conversationId: conversationId,
       message: message.trim(),
       history: history,
+      systemPrompt: systemPrompt,
     );
   }
 }

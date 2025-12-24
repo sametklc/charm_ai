@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
@@ -78,6 +77,10 @@ final getConversationsUseCaseProvider = Provider<GetConversationsUseCase>((ref) 
   return GetConversationsUseCase(ref.watch(chatRepositoryProvider));
 });
 
+final getCharacterConversationsUseCaseProvider = Provider<GetCharacterConversationsUseCase>((ref) {
+  return GetCharacterConversationsUseCase(ref.watch(chatRepositoryProvider));
+});
+
 final deleteConversationUseCaseProvider = Provider<DeleteConversationUseCase>((ref) {
   return DeleteConversationUseCase(ref.watch(chatRepositoryProvider));
 });
@@ -89,6 +92,9 @@ final deleteConversationUseCaseProvider = Provider<DeleteConversationUseCase>((r
 /// Current conversation provider
 final currentConversationProvider = StateProvider<ConversationEntity?>((ref) => null);
 
+/// Current character ID for chat
+final currentChatCharacterIdProvider = StateProvider<String?>((ref) => null);
+
 /// User conversations list provider
 final userConversationsProvider = FutureProvider<List<ConversationEntity>>((ref) async {
   final user = ref.watch(currentUserProvider);
@@ -96,6 +102,23 @@ final userConversationsProvider = FutureProvider<List<ConversationEntity>>((ref)
 
   final getConversations = ref.watch(getConversationsUseCaseProvider);
   final result = await getConversations(user.uid);
+
+  return result.fold(
+    (failure) => [],
+    (conversations) => conversations,
+  );
+});
+
+/// Conversations for a specific character
+final characterConversationsProvider = FutureProvider.family<List<ConversationEntity>, String>((ref, characterId) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+
+  final getCharacterConversations = ref.watch(getCharacterConversationsUseCaseProvider);
+  final result = await getCharacterConversations(
+    userId: user.uid,
+    characterId: characterId,
+  );
 
   return result.fold(
     (failure) => [],

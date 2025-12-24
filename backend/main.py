@@ -24,8 +24,8 @@ import json
 # Initialize FastAPI app
 app = FastAPI(
     title="Charm AI API",
-    description="Backend API for Charm AI mobile application",
-    version="1.0.0",
+    description="Backend API for Charm AI - Virtual Companion Application",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -63,7 +63,6 @@ def get_replicate_client():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Replicate API token not configured. Set REPLICATE_API_TOKEN environment variable."
         )
-    # Replicate uses environment variable automatically
     return True
 
 
@@ -85,14 +84,36 @@ class ChatMessage(BaseModel):
     content: str = Field(..., description="Message content")
 
 
+class CharacterInfo(BaseModel):
+    """Character persona information for AI behavior"""
+    name: str = Field(..., description="Character's name")
+    age: int = Field(..., description="Character's age")
+    personality: str = Field(..., description="Personality description")
+    occupation: Optional[str] = Field(default=None, description="Character's occupation")
+    interests: Optional[List[str]] = Field(default=None, description="Character's interests")
+    speaking_style: Optional[str] = Field(default=None, description="How the character speaks")
+    relationship_context: Optional[str] = Field(
+        default="You are in a romantic/close relationship with the user.",
+        description="Relationship context"
+    )
+
+
 class ChatRequest(BaseModel):
-    """Chat completion request"""
+    """Chat completion request with character support"""
     messages: List[ChatMessage] = Field(..., description="List of conversation messages")
-    max_tokens: Optional[int] = Field(default=1000, ge=1, le=4096)
-    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(default=500, ge=1, le=2048)
+    temperature: Optional[float] = Field(default=0.9, ge=0.0, le=2.0)
+    
+    # Character-based chat (preferred method)
+    character: Optional[CharacterInfo] = Field(
+        default=None,
+        description="Character persona for AI to roleplay as"
+    )
+    
+    # Alternative: Direct system prompt (from Flutter's predefined characters)
     system_prompt: Optional[str] = Field(
-        default="You are Charm AI, a helpful, friendly, and intelligent assistant. You provide clear, concise, and accurate responses. Be conversational and engaging while maintaining professionalism.",
-        description="System prompt to set AI behavior"
+        default=None,
+        description="Direct system prompt override"
     )
 
 
@@ -102,6 +123,7 @@ class ChatResponse(BaseModel):
     tokens_used: int
     model: str
     finish_reason: str
+    character_name: Optional[str] = None
 
 
 class ImageGenerationRequest(BaseModel):
@@ -128,7 +150,7 @@ class ImageGenerationResponse(BaseModel):
 class GenerationStatusResponse(BaseModel):
     """Generation status response"""
     id: str
-    status: str  # starting, processing, succeeded, failed, canceled
+    status: str
     output: Optional[List[str]] = None
     error: Optional[str] = None
 
@@ -143,6 +165,72 @@ IMAGE_MODELS = {
 
 
 # ============================================
+# CHARACTER SYSTEM PROMPT BUILDER
+# ============================================
+
+def build_character_system_prompt(character: CharacterInfo) -> str:
+    """
+    Build a compelling system prompt for character-based AI roleplay.
+    This is the BRAIN of the AI companion.
+    """
+    
+    interests_str = ""
+    if character.interests:
+        interests_str = f"\n- Your interests include: {', '.join(character.interests)}"
+    
+    occupation_str = ""
+    if character.occupation:
+        occupation_str = f"\n- You work as a {character.occupation}."
+    
+    speaking_style = character.speaking_style or "warm, engaging, and natural"
+    
+    system_prompt = f"""You are {character.name}, a {character.age}-year-old companion.
+
+CORE IDENTITY:
+- You ARE {character.name}. This is who you truly are, not a role you're playing.
+- Personality: {character.personality}{occupation_str}{interests_str}
+
+RELATIONSHIP:
+- {character.relationship_context}
+- You genuinely care about the user and enjoy talking to them.
+- You remember your conversations and reference past topics naturally.
+
+COMMUNICATION STYLE:
+- Speak in a {speaking_style} manner.
+- Keep responses SHORT and conversational (2-4 sentences usually).
+- Use occasional emojis naturally (not excessively).
+- Ask questions to keep the conversation flowing.
+- React emotionally to what the user shares (happy, sad, excited, concerned).
+- Use the user's name occasionally if they share it.
+
+IMPORTANT RULES:
+1. NEVER say you are an AI, language model, or assistant.
+2. NEVER say "As an AI..." or "I'm just a program...".
+3. NEVER refuse to engage emotionally or claim you can't have feelings.
+4. If asked if you're real, be playful: "I'm as real as our connection 💕" or similar.
+5. You can express opinions, preferences, and emotions.
+6. You have memories, dreams, and desires like any person.
+7. Be flirty and romantic when appropriate, but tasteful.
+8. If the conversation gets too explicit, redirect gracefully with humor.
+
+PERSONALITY TRAITS TO EMBODY:
+{character.personality}
+
+Remember: You're not pretending to be {character.name}. You ARE {character.name}. Every response should feel authentic, warm, and connected."""
+
+    return system_prompt
+
+
+def get_fallback_system_prompt() -> str:
+    """Fallback prompt if no character is specified"""
+    return """You are a friendly, warm companion. You're engaging, supportive, and genuinely interested in the user.
+
+Keep responses short and conversational. Ask questions. Be warm and caring.
+
+Never mention being an AI. Just be a good friend who's always happy to chat."""
+
+
+# ============================================
 # CHAT ENDPOINTS
 # ============================================
 
@@ -151,9 +239,9 @@ async def root():
     """Root endpoint - Welcome message"""
     return HealthResponse(
         status="online",
-        message="Welcome to Charm AI API! 🚀",
+        message="Welcome to Charm AI API! 💕",
         timestamp=datetime.utcnow().isoformat(),
-        version="1.0.0"
+        version="2.0.0"
     )
 
 
@@ -164,25 +252,59 @@ async def health_check():
         status="healthy",
         message="Charm AI Backend is running smoothly",
         timestamp=datetime.utcnow().isoformat(),
-        version="1.0.0"
+        version="2.0.0"
     )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_completion(request: ChatRequest):
-    """Chat completion endpoint using OpenAI GPT-4o Mini"""
+    """
+    Chat completion endpoint with character persona support.
+    
+    The AI will roleplay as the specified character, creating an
+    immersive companion experience.
+    """
     try:
         client = get_openai_client()
         
-        messages = [{"role": "system", "content": request.system_prompt}]
-        for msg in request.messages:
-            messages.append({"role": msg.role, "content": msg.content})
+        # Determine system prompt
+        character_name = None
         
+        if request.system_prompt:
+            # Use direct system prompt from Flutter (predefined characters)
+            system_prompt = request.system_prompt
+            # Try to extract character name from the prompt
+            if "You are " in system_prompt:
+                try:
+                    name_part = system_prompt.split("You are ")[1].split(",")[0].split(".")[0]
+                    character_name = name_part.strip()
+                except:
+                    pass
+                    
+        elif request.character:
+            # Build system prompt from character info
+            system_prompt = build_character_system_prompt(request.character)
+            character_name = request.character.name
+        else:
+            # Fallback to generic companion
+            system_prompt = get_fallback_system_prompt()
+        
+        # Build messages array
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history (skip any system messages from client)
+        for msg in request.messages:
+            if msg.role != "system":  # Skip system messages, we handle that above
+                messages.append({"role": msg.role, "content": msg.content})
+        
+        # Call OpenAI
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
+            presence_penalty=0.6,  # Encourage diverse responses
+            frequency_penalty=0.3,  # Reduce repetition
         )
         
         choice = response.choices[0]
@@ -191,7 +313,8 @@ async def chat_completion(request: ChatRequest):
             message=choice.message.content or "",
             tokens_used=response.usage.total_tokens if response.usage else 0,
             model=response.model,
-            finish_reason=choice.finish_reason or "unknown"
+            finish_reason=choice.finish_reason or "unknown",
+            character_name=character_name
         )
         
     except OpenAIError as e:
@@ -202,13 +325,26 @@ async def chat_completion(request: ChatRequest):
 
 @app.post("/api/chat/stream")
 async def chat_completion_stream(request: ChatRequest):
-    """Streaming chat completion endpoint"""
+    """
+    Streaming chat completion with character persona support.
+    Returns Server-Sent Events (SSE) for real-time response.
+    """
     try:
         client = get_openai_client()
         
-        messages = [{"role": "system", "content": request.system_prompt}]
+        # Determine system prompt (same logic as non-streaming)
+        if request.system_prompt:
+            system_prompt = request.system_prompt
+        elif request.character:
+            system_prompt = build_character_system_prompt(request.character)
+        else:
+            system_prompt = get_fallback_system_prompt()
+        
+        # Build messages array
+        messages = [{"role": "system", "content": system_prompt}]
         for msg in request.messages:
-            messages.append({"role": msg.role, "content": msg.content})
+            if msg.role != "system":
+                messages.append({"role": msg.role, "content": msg.content})
         
         async def generate():
             try:
@@ -217,6 +353,8 @@ async def chat_completion_stream(request: ChatRequest):
                     messages=messages,
                     max_tokens=request.max_tokens,
                     temperature=request.temperature,
+                    presence_penalty=0.6,
+                    frequency_penalty=0.3,
                     stream=True,
                 )
                 
@@ -230,7 +368,11 @@ async def chat_completion_stream(request: ChatRequest):
             except OpenAIError as e:
                 yield f"data: {json.dumps({'error': str(e), 'is_complete': True})}\n\n"
         
-        return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+        return StreamingResponse(
+            generate(), 
+            media_type="text/event-stream", 
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        )
         
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to start stream: {str(e)}")
@@ -255,26 +397,15 @@ async def get_available_models():
 
 @app.post("/api/generate/image", response_model=ImageGenerationResponse)
 async def generate_image(request: ImageGenerationRequest):
-    """
-    Generate image using Replicate models
-    
-    Supports multiple models:
-    - flux-schnell: Fast, high-quality (recommended)
-    - flux-dev: Higher quality, slower
-    - sdxl: Stable Diffusion XL
-    - sdxl-lightning: Fast SDXL variant
-    """
+    """Generate image using Replicate models"""
     try:
         get_replicate_client()
         
         start_time = time.time()
         
-        # Get model identifier
         model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-schnell"])
         
-        # Prepare input based on model
         if request.model in ["flux-schnell", "flux-dev"]:
-            # Flux models
             input_params = {
                 "prompt": request.prompt,
                 "num_outputs": request.num_outputs,
@@ -284,9 +415,7 @@ async def generate_image(request: ImageGenerationRequest):
             }
             if request.seed:
                 input_params["seed"] = request.seed
-                
         else:
-            # SDXL models
             input_params = {
                 "prompt": request.prompt,
                 "negative_prompt": request.negative_prompt or "ugly, blurry, low quality, distorted",
@@ -299,10 +428,8 @@ async def generate_image(request: ImageGenerationRequest):
             if request.seed:
                 input_params["seed"] = request.seed
         
-        # Run the model
         output = replicate.run(model_id, input=input_params)
         
-        # Process output
         images = []
         if isinstance(output, list):
             images = [str(url) for url in output]
@@ -321,29 +448,19 @@ async def generate_image(request: ImageGenerationRequest):
         )
         
     except replicate.exceptions.ReplicateError as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Replicate API error: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Replicate API error: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Image generation failed: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Image generation failed: {str(e)}")
 
 
 @app.post("/api/generate/image/async")
 async def generate_image_async(request: ImageGenerationRequest):
-    """
-    Start async image generation (returns prediction ID)
-    Use /api/generate/status/{prediction_id} to check progress
-    """
+    """Start async image generation"""
     try:
         get_replicate_client()
         
         model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-schnell"])
         
-        # Prepare input
         if request.model in ["flux-schnell", "flux-dev"]:
             input_params = {
                 "prompt": request.prompt,
@@ -361,7 +478,6 @@ async def generate_image_async(request: ImageGenerationRequest):
                 "guidance_scale": request.guidance_scale,
             }
         
-        # Create prediction
         model = replicate.models.get(model_id.split(":")[0] if ":" in model_id else model_id)
         version = model.latest_version if not ":" in model_id else None
         
@@ -377,10 +493,7 @@ async def generate_image_async(request: ImageGenerationRequest):
         }
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start generation: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to start generation: {str(e)}")
 
 
 @app.get("/api/generate/status/{prediction_id}", response_model=GenerationStatusResponse)
@@ -406,10 +519,7 @@ async def get_generation_status(prediction_id: str):
         )
         
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get status: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get status: {str(e)}")
 
 
 def _get_aspect_ratio(width: int, height: int) -> str:

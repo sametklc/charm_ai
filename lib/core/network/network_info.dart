@@ -15,14 +15,22 @@ class NetworkInfoImpl implements NetworkInfo {
   @override
   Future<bool> get isConnected async {
     final result = await connectivity.checkConnectivity();
-    return !result.contains(ConnectivityResult.none);
+    return _hasConnection(result);
   }
 
   @override
   Stream<bool> get onConnectivityChanged {
-    return connectivity.onConnectivityChanged.map(
-      (result) => !result.contains(ConnectivityResult.none),
-    );
+    return connectivity.onConnectivityChanged.map(_hasConnection);
+  }
+
+  /// Check if there's an active connection
+  /// Handles both single ConnectivityResult and List<ConnectivityResult>
+  bool _hasConnection(dynamic result) {
+    if (result is List<ConnectivityResult>) {
+      return result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    } else if (result is ConnectivityResult) {
+      return result != ConnectivityResult.none;
+    }
+    return false;
   }
 }
-

@@ -10,6 +10,8 @@ class MessageModel extends MessageEntity {
     required super.timestamp,
     super.isError,
     super.tokensUsed,
+    super.messageType,
+    super.imageUrl,
   });
 
   /// Create from JSON (API response)
@@ -23,6 +25,8 @@ class MessageModel extends MessageEntity {
           : DateTime.now(),
       isError: json['is_error'] ?? false,
       tokensUsed: json['tokens_used'],
+      messageType: _parseMessageType(json['message_type']),
+      imageUrl: json['image_url'],
     );
   }
 
@@ -35,6 +39,8 @@ class MessageModel extends MessageEntity {
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isError: data['isError'] ?? false,
       tokensUsed: data['tokensUsed'],
+      messageType: _parseMessageType(data['messageType']),
+      imageUrl: data['imageUrl'],
     );
   }
 
@@ -47,6 +53,8 @@ class MessageModel extends MessageEntity {
       timestamp: entity.timestamp,
       isError: entity.isError,
       tokensUsed: entity.tokensUsed,
+      messageType: entity.messageType,
+      imageUrl: entity.imageUrl,
     );
   }
 
@@ -75,6 +83,44 @@ class MessageModel extends MessageEntity {
       role: MessageRole.assistant,
       timestamp: DateTime.now(),
       tokensUsed: tokensUsed,
+    );
+  }
+  
+  /// Create selfie request message (user asking for selfie)
+  factory MessageModel.selfieRequest({String? id}) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: 'Send me a selfie! 📸',
+      role: MessageRole.user,
+      timestamp: DateTime.now(),
+      messageType: MessageType.selfieRequest,
+    );
+  }
+  
+  /// Create selfie loading message (while generating)
+  factory MessageModel.selfieLoading({String? id}) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: 'Taking a selfie for you... 📸',
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      messageType: MessageType.selfieLoading,
+    );
+  }
+  
+  /// Create image message (selfie response)
+  factory MessageModel.image({
+    required String imageUrl,
+    String? caption,
+    String? id,
+  }) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: caption ?? 'Here\'s a selfie for you! 💕📸',
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      messageType: MessageType.image,
+      imageUrl: imageUrl,
     );
   }
 
@@ -108,6 +154,8 @@ class MessageModel extends MessageEntity {
       'timestamp': Timestamp.fromDate(timestamp),
       'isError': isError,
       'tokensUsed': tokensUsed,
+      'messageType': _messageTypeToString(messageType),
+      'imageUrl': imageUrl,
     };
   }
 
@@ -120,7 +168,36 @@ class MessageModel extends MessageEntity {
       timestamp: timestamp,
       isError: isError,
       tokensUsed: tokensUsed,
+      messageType: messageType,
+      imageUrl: imageUrl,
     );
+  }
+  
+  static MessageType _parseMessageType(String? type) {
+    if (type == null) return MessageType.text;
+    switch (type.toLowerCase()) {
+      case 'image':
+        return MessageType.image;
+      case 'selfierequest':
+        return MessageType.selfieRequest;
+      case 'selfieloading':
+        return MessageType.selfieLoading;
+      default:
+        return MessageType.text;
+    }
+  }
+  
+  static String _messageTypeToString(MessageType type) {
+    switch (type) {
+      case MessageType.text:
+        return 'text';
+      case MessageType.image:
+        return 'image';
+      case MessageType.selfieRequest:
+        return 'selfieRequest';
+      case MessageType.selfieLoading:
+        return 'selfieLoading';
+    }
   }
 
   static MessageRole _parseRole(String role) {
@@ -153,6 +230,7 @@ class ConversationModel extends ConversationEntity {
   const ConversationModel({
     required super.id,
     required super.userId,
+    required super.characterId,
     super.title,
     required super.messages,
     required super.createdAt,
@@ -165,6 +243,7 @@ class ConversationModel extends ConversationEntity {
     return ConversationModel(
       id: doc.id,
       userId: data['userId'] ?? '',
+      characterId: data['characterId'] ?? '',
       title: data['title'],
       messages: [], // Messages loaded separately
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -177,6 +256,7 @@ class ConversationModel extends ConversationEntity {
     return ConversationModel(
       id: entity.id,
       userId: entity.userId,
+      characterId: entity.characterId,
       title: entity.title,
       messages: entity.messages,
       createdAt: entity.createdAt,
@@ -184,16 +264,19 @@ class ConversationModel extends ConversationEntity {
     );
   }
 
-  /// Create new conversation
+  /// Create new conversation with a character
   factory ConversationModel.create({
     required String id,
     required String userId,
+    required String characterId,
+    String? title,
   }) {
     final now = DateTime.now();
     return ConversationModel(
       id: id,
       userId: userId,
-      title: null,
+      characterId: characterId,
+      title: title,
       messages: const [],
       createdAt: now,
       updatedAt: now,
@@ -204,6 +287,7 @@ class ConversationModel extends ConversationEntity {
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
+      'characterId': characterId,
       'title': title,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -215,6 +299,7 @@ class ConversationModel extends ConversationEntity {
     return ConversationEntity(
       id: id,
       userId: userId,
+      characterId: characterId,
       title: title,
       messages: messages,
       createdAt: createdAt,
@@ -226,6 +311,7 @@ class ConversationModel extends ConversationEntity {
   ConversationModel copyWith({
     String? id,
     String? userId,
+    String? characterId,
     String? title,
     List<MessageEntity>? messages,
     DateTime? createdAt,
@@ -234,6 +320,7 @@ class ConversationModel extends ConversationEntity {
     return ConversationModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      characterId: characterId ?? this.characterId,
       title: title ?? this.title,
       messages: messages ?? this.messages,
       createdAt: createdAt ?? this.createdAt,

@@ -19,16 +19,18 @@ class ChatRepositoryImpl implements ChatRepository {
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) async {
     try {
       // Create and save user message
       final userMessage = MessageModel.user(content: message);
       await remoteDataSource.saveMessage(conversationId, userMessage);
 
-      // Get AI response
+      // Get AI response with character's system prompt
       final response = await remoteDataSource.sendMessage(
         message: message,
         history: history,
+        systemPrompt: systemPrompt,
       );
 
       // Save AI response
@@ -51,17 +53,19 @@ class ChatRepositoryImpl implements ChatRepository {
     required String conversationId,
     required String message,
     required List<MessageEntity> history,
+    String? systemPrompt,
   }) async* {
     try {
       // Create and save user message
       final userMessage = MessageModel.user(content: message);
       await remoteDataSource.saveMessage(conversationId, userMessage);
 
-      // Stream AI response
+      // Stream AI response with character's system prompt
       String fullResponse = '';
       await for (final chunk in remoteDataSource.sendMessageStream(
         message: message,
         history: history,
+        systemPrompt: systemPrompt,
       )) {
         fullResponse += chunk;
         yield Right(chunk);
@@ -132,12 +136,36 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, ConversationEntity>> createConversation(String userId) async {
+  Future<Either<Failure, List<ConversationEntity>>> getUserCharacterConversations(
+    String userId,
+    String characterId,
+  ) async {
+    try {
+      final conversations = await remoteDataSource.getUserCharacterConversations(
+        userId,
+        characterId,
+      );
+      return Right(conversations.map((c) => c.toEntity()).toList());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to get character conversations'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ConversationEntity>> createConversation({
+    required String userId,
+    required String characterId,
+    String? title,
+  }) async {
     try {
       final conversationId = _uuid.v4();
       final conversation = ConversationModel.create(
         id: conversationId,
         userId: userId,
+        characterId: characterId,
+        title: title,
       );
 
       await remoteDataSource.saveConversation(conversation);
