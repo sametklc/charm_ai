@@ -133,10 +133,11 @@ class ImageGenerationRequest(BaseModel):
     width: Optional[int] = Field(default=1024, ge=256, le=1440)
     height: Optional[int] = Field(default=1024, ge=256, le=1440)
     num_outputs: Optional[int] = Field(default=1, ge=1, le=4)
-    model: Optional[str] = Field(default="flux-schnell", description="Model to use: flux-schnell, flux-dev, sdxl")
+    model: Optional[str] = Field(default="flux-pulid", description="Model to use: flux-pulid, flux-schnell, flux-dev, sdxl")
     guidance_scale: Optional[float] = Field(default=7.5, ge=1.0, le=20.0)
     num_inference_steps: Optional[int] = Field(default=28, ge=1, le=50)
     seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
+    reference_image_url: Optional[str] = Field(default=None, description="Reference image URL for identity preservation (img2img)")
 
 
 class ImageGenerationResponse(BaseModel):
@@ -158,7 +159,8 @@ class GenerationStatusResponse(BaseModel):
 # Available image models
 IMAGE_MODELS = {
     "flux-schnell": "black-forest-labs/flux-schnell",
-    "flux-dev": "black-forest-labs/flux-dev", 
+    "flux-dev": "black-forest-labs/flux-dev",
+    "flux-pulid": "lucataco/flux-pulid-v1:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f9e69677f09956d75",
     "sdxl": "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
     "sdxl-lightning": "bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
 }
@@ -387,6 +389,7 @@ async def get_available_models():
     """Get list of available image generation models"""
     return {
         "models": [
+            {"id": "flux-pulid", "name": "Flux PuLID", "description": "Identity-preserving image generation", "speed": "medium"},
             {"id": "flux-schnell", "name": "Flux Schnell", "description": "Fast, high-quality images", "speed": "fast"},
             {"id": "flux-dev", "name": "Flux Dev", "description": "Higher quality, slower", "speed": "medium"},
             {"id": "sdxl", "name": "SDXL", "description": "Stable Diffusion XL", "speed": "medium"},
@@ -403,9 +406,28 @@ async def generate_image(request: ImageGenerationRequest):
         
         start_time = time.time()
         
-        model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-schnell"])
+        model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-pulid"])
         
-        if request.model in ["flux-schnell", "flux-dev"]:
+        if request.model == "flux-pulid":
+            # Flux PuLID for identity preservation with scenario changes
+            input_params = {
+                "prompt": request.prompt,
+                "num_outputs": request.num_outputs,
+                "width": request.width,
+                "height": request.height,
+                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
+                "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
+                "start_step": 0,  # Generate from scratch
+            }
+            # CRITICAL: main_face_image for identity preservation
+            if request.reference_image_url:
+                input_params["main_face_image"] = request.reference_image_url
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="flux-pulid requires reference_image_url (main_face_image)"
+                )
+        elif request.model in ["flux-schnell", "flux-dev"]:
             input_params = {
                 "prompt": request.prompt,
                 "num_outputs": request.num_outputs,
@@ -415,6 +437,9 @@ async def generate_image(request: ImageGenerationRequest):
             }
             if request.seed:
                 input_params["seed"] = request.seed
+            # Add reference image for identity preservation (img2img)
+            if request.reference_image_url:
+                input_params["image"] = request.reference_image_url
         else:
             input_params = {
                 "prompt": request.prompt,
@@ -459,15 +484,36 @@ async def generate_image_async(request: ImageGenerationRequest):
     try:
         get_replicate_client()
         
-        model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-schnell"])
+        model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-pulid"])
         
-        if request.model in ["flux-schnell", "flux-dev"]:
+        if request.model == "flux-pulid":
+            # Flux PuLID for identity preservation
+            input_params = {
+                "prompt": request.prompt,
+                "num_outputs": request.num_outputs,
+                "width": request.width,
+                "height": request.height,
+                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
+                "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
+                "start_step": 0,
+            }
+            if request.reference_image_url:
+                input_params["main_face_image"] = request.reference_image_url
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="flux-pulid requires reference_image_url (main_face_image)"
+                )
+        elif request.model in ["flux-schnell", "flux-dev"]:
             input_params = {
                 "prompt": request.prompt,
                 "num_outputs": request.num_outputs,
                 "aspect_ratio": _get_aspect_ratio(request.width, request.height),
                 "output_format": "webp",
             }
+            # Add reference image for identity preservation (img2img)
+            if request.reference_image_url:
+                input_params["image"] = request.reference_image_url
         else:
             input_params = {
                 "prompt": request.prompt,
