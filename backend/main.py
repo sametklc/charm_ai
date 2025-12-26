@@ -453,28 +453,53 @@ async def generate_image(request: ImageGenerationRequest):
             if request.seed:
                 input_params["seed"] = request.seed
         
+        print(f"🔵 Backend: Running Replicate model {model_id} with params: {input_params}")
         output = replicate.run(model_id, input=input_params)
+        print(f"🔵 Backend: Replicate output type: {type(output)}")
+        print(f"🔵 Backend: Replicate output: {output}")
         
         images = []
-        if isinstance(output, list):
-            images = [str(url) for url in output]
-        elif hasattr(output, '__iter__'):
-            images = [str(url) for url in output]
-        else:
-            images = [str(output)]
+        try:
+            if isinstance(output, list):
+                print(f"🔵 Backend: Output is a list with {len(output)} items")
+                images = [str(url) for url in output]
+            elif hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
+                print(f"🔵 Backend: Output is iterable (not str/bytes)")
+                images = [str(url) for url in output]
+            else:
+                print(f"🔵 Backend: Output is a single value")
+                images = [str(output)]
+            print(f"✅ Backend: Processed images list: {images}")
+        except Exception as parse_error:
+            print(f"❌ Backend: Error parsing Replicate output: {parse_error}")
+            print(f"❌ Backend: Output that caused error: {output} (type: {type(output)})")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail=f"Error parsing Replicate output: {str(parse_error)}"
+            )
         
         generation_time = time.time() - start_time
         
-        return ImageGenerationResponse(
+        response_data = ImageGenerationResponse(
             images=images,
             generation_time=round(generation_time, 2),
             model=request.model,
             prompt=request.prompt
         )
+        print(f"✅ Backend: Returning response with {len(images)} images")
+        return response_data
         
     except replicate.exceptions.ReplicateError as e:
+        print(f"❌ Backend: ReplicateError: {str(e)}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Replicate API error: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTPException as-is
+        raise
     except Exception as e:
+        print(f"❌ Backend: Unexpected error: {str(e)}")
+        print(f"❌ Backend: Error type: {type(e)}")
+        import traceback
+        print(f"❌ Backend: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Image generation failed: {str(e)}")
 
 
