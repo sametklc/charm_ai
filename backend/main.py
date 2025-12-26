@@ -160,7 +160,7 @@ class GenerationStatusResponse(BaseModel):
 IMAGE_MODELS = {
     "flux-schnell": "black-forest-labs/flux-schnell",
     "flux-dev": "black-forest-labs/flux-dev",
-    "flux-pulid": "lucataco/flux-pulid:3d04f9",  # Flux PuLID for identity preservation
+    "flux-pulid": "bytedance/flux-pulid:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b",
     "sdxl": "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
     "sdxl-lightning": "bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
 }
