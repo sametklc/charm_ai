@@ -160,7 +160,7 @@ class GenerationStatusResponse(BaseModel):
 IMAGE_MODELS = {
     "flux-schnell": "black-forest-labs/flux-schnell",
     "flux-dev": "black-forest-labs/flux-dev",
-    "flux-pulid": "lucataco/flux-pulid-v1:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f9e69677f09956d75",
+    "flux-pulid": "lucataco/flux-pulid:3d04f9",  # Flux PuLID for identity preservation
     "sdxl": "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
     "sdxl-lightning": "bytedance/sdxl-lightning-4step:5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
 }
@@ -454,7 +454,8 @@ async def generate_image(request: ImageGenerationRequest):
                 input_params["seed"] = request.seed
         
         print(f"🔵 Backend: Running Replicate model {model_id} with params: {input_params}")
-        output = replicate.run(model_id, input=input_params)
+        # Run Replicate in thread pool to avoid blocking async event loop
+        output = await asyncio.to_thread(replicate.run, model_id, input=input_params)
         print(f"🔵 Backend: Replicate output type: {type(output)}")
         print(f"🔵 Backend: Replicate output: {output}")
         
@@ -489,18 +490,27 @@ async def generate_image(request: ImageGenerationRequest):
         print(f"✅ Backend: Returning response with {len(images)} images")
         return response_data
         
+    except HTTPException:
+        # Re-raise HTTPException as-is (this must be before other exceptions)
+        raise
     except replicate.exceptions.ReplicateError as e:
         print(f"❌ Backend: ReplicateError: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Replicate API error: {str(e)}")
-    except HTTPException:
-        # Re-raise HTTPException as-is
-        raise
+        print(f"❌ Backend: ReplicateError type: {type(e)}")
+        import traceback
+        print(f"❌ Backend: ReplicateError traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, 
+            detail=f"Replicate API error: {str(e)}"
+        )
     except Exception as e:
         print(f"❌ Backend: Unexpected error: {str(e)}")
         print(f"❌ Backend: Error type: {type(e)}")
         import traceback
         print(f"❌ Backend: Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Image generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Image generation failed: {str(e)}"
+        )
 
 
 @app.post("/api/generate/image/async")
@@ -618,8 +628,16 @@ def _get_aspect_ratio(width: int, height: int) -> str:
 # ============================================
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
-    return {"error": exc.detail, "status_code": exc.status_code, "timestamp": datetime.utcnow().isoformat()}
+async def http_exception_handler(request, exc: HTTPException):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail, 
+            "status_code": exc.status_code, 
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
 
 
 # ============================================
