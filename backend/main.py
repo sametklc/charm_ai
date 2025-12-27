@@ -410,14 +410,18 @@ async def generate_image(request: ImageGenerationRequest):
         
         if request.model == "flux-pulid":
             # Flux PuLID for identity preservation with scenario changes
+            # CRITICAL: id_weight must be 0.85 to allow body movement (1.0 freezes pose)
             input_params = {
                 "prompt": request.prompt,
                 "num_outputs": request.num_outputs,
-                "width": request.width,
-                "height": request.height,
+                "width": request.width if request.width else 832,
+                "height": request.height if request.height else 1216,
                 "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
                 "start_step": 0,  # Generate from scratch
+                "id_weight": 0.85,  # CRITICAL: Lower value allows scenario changes, 1.0 freezes pose
+                "true_cfg": 1.0,  # True classifier-free guidance
+                "max_sequence_length": 128,  # Maximum prompt length
             }
             # CRITICAL: main_face_image for identity preservation
             if request.reference_image_url:
@@ -522,15 +526,19 @@ async def generate_image_async(request: ImageGenerationRequest):
         model_id = IMAGE_MODELS.get(request.model, IMAGE_MODELS["flux-pulid"])
         
         if request.model == "flux-pulid":
-            # Flux PuLID for identity preservation
+            # Flux PuLID for identity preservation with scenario changes
+            # CRITICAL: id_weight must be 0.85 to allow body movement (1.0 freezes pose)
             input_params = {
                 "prompt": request.prompt,
                 "num_outputs": request.num_outputs,
-                "width": request.width,
-                "height": request.height,
+                "width": request.width if request.width else 832,
+                "height": request.height if request.height else 1216,
                 "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
-                "start_step": 0,
+                "start_step": 0,  # Generate from scratch
+                "id_weight": 0.85,  # CRITICAL: Lower value allows scenario changes, 1.0 freezes pose
+                "true_cfg": 1.0,  # True classifier-free guidance
+                "max_sequence_length": 128,  # Maximum prompt length
             }
             if request.reference_image_url:
                 input_params["main_face_image"] = request.reference_image_url
