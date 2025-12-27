@@ -16,3 +16,5 @@ class GetAllCharactersUseCase implements UseCase<List<CharacterEntity>, NoParams
   }
 }
 
+
+

@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to read/write their own profile images
+    match /profile_images/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow authenticated users to read/write character avatars
+    // Read: Anyone authenticated can read (for public characters)
+    // Write: Only the owner can write
+    match /characters/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow authenticated users to read/write chat media in their conversations
+    match /chat_media/{conversationId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Allow authenticated users to read/write in the general media folder
+    match /media/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Allow authenticated users to read/write custom characters
+    match /custom_characters/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Allow authenticated users to read/write in profiles folder
+    match /profiles/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

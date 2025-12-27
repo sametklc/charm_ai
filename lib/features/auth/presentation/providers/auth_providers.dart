@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/services/storage_provider.dart';
+import '../../../../core/services/storage_service.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/user_entity.dart';
@@ -10,6 +12,7 @@ import '../../domain/usecases/register_usecase.dart';
 import '../../domain/usecases/reset_password_usecase.dart';
 import '../../domain/usecases/sign_in_usecase.dart';
 import '../../domain/usecases/sign_out_usecase.dart';
+import '../../domain/usecases/update_profile_usecase.dart';
 
 // ============================================
 // FIREBASE INSTANCES
@@ -41,6 +44,7 @@ final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(
     remoteDataSource: ref.watch(authRemoteDataSourceProvider),
+    storageService: ref.watch(storageServiceProvider),
   );
 });
 
@@ -72,32 +76,45 @@ final resetPasswordUseCaseProvider = Provider<ResetPasswordUseCase>((ref) {
   return ResetPasswordUseCase(ref.watch(authRepositoryProvider));
 });
 
+final updateProfileUseCaseProvider = Provider<UpdateProfileUseCase>((ref) {
+  return UpdateProfileUseCase(ref.watch(authRepositoryProvider));
+});
+
 // ============================================
 // AUTH STATE
 // ============================================
 
 /// Stream provider for auth state changes
 final authStateProvider = StreamProvider<UserEntity?>((ref) {
-  return ref.watch(authRepositoryProvider).authStateChanges;
+  print('🔵 AuthProvider: authStateProvider started');
+  return ref.watch(authRepositoryProvider).authStateChanges.map((user) {
+    print('✅ AuthProvider: Auth state changed. User: ${user?.uid ?? "NULL"}');
+    return user;
+  });
 });
 
 /// Provider to check if user is authenticated
 final isAuthenticatedProvider = Provider<bool>((ref) {
   final authState = ref.watch(authStateProvider);
-  return authState.when(
+  final isAuth = authState.when(
     data: (user) => user != null,
     loading: () => false,
     error: (_, __) => false,
   );
+  print('🔵 AuthProvider: isAuthenticated: $isAuth');
+  return isAuth;
 });
 
 /// Provider to get current user
 final currentUserProvider = Provider<UserEntity?>((ref) {
   final authState = ref.watch(authStateProvider);
-  return authState.when(
+  final user = authState.when(
     data: (user) => user,
     loading: () => null,
     error: (_, __) => null,
   );
+  print('🔵 AuthProvider: currentUser: ${user?.uid ?? "NULL"}');
+  return user;
 });
+
 

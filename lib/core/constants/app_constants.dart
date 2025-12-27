@@ -17,8 +17,9 @@ class AppConstants {
 
   /// Firebase Collections
   static const String usersCollection = 'users';
-  static const String chatsCollection = 'chats';
+  static const String chatsCollection = 'conversations'; // FIXED: was 'chats', should be 'conversations'
   static const String messagesCollection = 'messages';
   static const String mediaCollection = 'generated_media';
 }
+
 

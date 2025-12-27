@@ -411,22 +411,22 @@ async def generate_image(request: ImageGenerationRequest):
         if request.model == "flux-pulid":
             # Flux PuLID for identity preservation with scenario changes
             # CRITICAL: id_weight must be 0.85 to allow body movement (1.0 freezes pose)
+            # Using official ByteDance Flux PuLID model
             input_params = {
                 "prompt": request.prompt,
-                "num_outputs": request.num_outputs,
+                "main_face_image": request.reference_image_url if request.reference_image_url else None,
+                "num_outputs": request.num_outputs if request.num_outputs else 1,
                 "width": request.width if request.width else 832,
                 "height": request.height if request.height else 1216,
-                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
+                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "start_step": 0,  # Generate from scratch
-                "id_weight": 0.85,  # CRITICAL: Lower value allows scenario changes, 1.0 freezes pose
+                "id_weight": 0.85,  # CRITICAL: 0.85 allows action/scenario changes, 1.0 freezes pose
                 "true_cfg": 1.0,  # True classifier-free guidance
                 "max_sequence_length": 128,  # Maximum prompt length
             }
-            # CRITICAL: main_face_image for identity preservation
-            if request.reference_image_url:
-                input_params["main_face_image"] = request.reference_image_url
-            else:
+            # CRITICAL: main_face_image is required for identity preservation
+            if not request.reference_image_url:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="flux-pulid requires reference_image_url (main_face_image)"
@@ -528,21 +528,22 @@ async def generate_image_async(request: ImageGenerationRequest):
         if request.model == "flux-pulid":
             # Flux PuLID for identity preservation with scenario changes
             # CRITICAL: id_weight must be 0.85 to allow body movement (1.0 freezes pose)
+            # Using official ByteDance Flux PuLID model
             input_params = {
                 "prompt": request.prompt,
-                "num_outputs": request.num_outputs,
+                "main_face_image": request.reference_image_url if request.reference_image_url else None,
+                "num_outputs": request.num_outputs if request.num_outputs else 1,
                 "width": request.width if request.width else 832,
                 "height": request.height if request.height else 1216,
-                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "num_steps": request.num_inference_steps if request.num_inference_steps else 20,
+                "guidance_scale": request.guidance_scale if request.guidance_scale else 3.5,
                 "start_step": 0,  # Generate from scratch
-                "id_weight": 0.85,  # CRITICAL: Lower value allows scenario changes, 1.0 freezes pose
+                "id_weight": 0.85,  # CRITICAL: 0.85 allows action/scenario changes, 1.0 freezes pose
                 "true_cfg": 1.0,  # True classifier-free guidance
                 "max_sequence_length": 128,  # Maximum prompt length
             }
-            if request.reference_image_url:
-                input_params["main_face_image"] = request.reference_image_url
-            else:
+            # CRITICAL: main_face_image is required for identity preservation
+            if not request.reference_image_url:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="flux-pulid requires reference_image_url (main_face_image)"

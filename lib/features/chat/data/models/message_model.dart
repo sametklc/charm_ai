@@ -1,48 +1,127 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/message_entity.dart';
 
-/// Message model - Data layer representation
-class MessageModel extends MessageEntity {
+/// Message Model - Data layer representation of MessageEntity
+class MessageModel {
+  final String id;
+  final String content;
+  final MessageRole role;
+  final DateTime timestamp;
+  final bool isError;
+  final int? tokensUsed;
+  final MessageType messageType;
+  final String? imageUrl;
+  final String? userId;
+
   const MessageModel({
-    required super.id,
-    required super.content,
-    required super.role,
-    required super.timestamp,
-    super.isError,
-    super.tokensUsed,
-    super.messageType,
-    super.imageUrl,
+    required this.id,
+    required this.content,
+    required this.role,
+    required this.timestamp,
+    this.isError = false,
+    this.tokensUsed,
+    this.messageType = MessageType.text,
+    this.imageUrl,
+    this.userId,
   });
 
-  /// Create from JSON (API response)
-  factory MessageModel.fromJson(Map<String, dynamic> json) {
+  /// Factory constructor for user messages
+  factory MessageModel.user({
+    required String content,
+    String? userId,
+    String? id,
+  }) {
     return MessageModel(
-      id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: json['content'] ?? json['message'] ?? '',
-      role: _parseRole(json['role'] ?? 'assistant'),
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
-          : DateTime.now(),
-      isError: json['is_error'] ?? false,
-      tokensUsed: json['tokens_used'],
-      messageType: _parseMessageType(json['message_type']),
-      imageUrl: json['image_url'],
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: content,
+      role: MessageRole.user,
+      timestamp: DateTime.now(),
+      userId: userId,
     );
   }
 
-  /// Create from Firestore document
-  factory MessageModel.fromFirestore(Map<String, dynamic> data, String id) {
+  /// Factory constructor for assistant messages
+  factory MessageModel.assistant({
+    required String content,
+    int? tokensUsed,
+    String? userId,
+    String? id,
+  }) {
     return MessageModel(
-      id: id,
-      content: data['content'] ?? '',
-      role: _parseRole(data['role'] ?? 'user'),
-      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isError: data['isError'] ?? false,
-      tokensUsed: data['tokensUsed'],
-      messageType: _parseMessageType(data['messageType']),
-      imageUrl: data['imageUrl'],
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: content,
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      tokensUsed: tokensUsed,
+      userId: userId,
     );
   }
+
+  /// Factory constructor for error messages
+  factory MessageModel.error({
+    required String content,
+    String? userId,
+    String? id,
+  }) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: content,
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      isError: true,
+      userId: userId,
+    );
+  }
+
+  /// Factory constructor for image messages
+  factory MessageModel.image({
+    required String imageUrl,
+    String? userId,
+    String? id,
+  }) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: 'Image',
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      messageType: MessageType.image,
+      imageUrl: imageUrl,
+      userId: userId,
+    );
+  }
+
+  /// Factory constructor for selfie request messages
+  factory MessageModel.selfieRequest({
+    String? userId,
+    String? id,
+  }) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: 'Send me a selfie! 📸',
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      messageType: MessageType.selfieRequest,
+      userId: userId,
+    );
+  }
+
+  /// Factory constructor for selfie loading messages
+  factory MessageModel.selfieLoading({
+    String? userId,
+    String? id,
+  }) {
+    return MessageModel(
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      content: 'Generating your selfie...',
+      role: MessageRole.assistant,
+      timestamp: DateTime.now(),
+      messageType: MessageType.selfieLoading,
+      userId: userId,
+    );
+  }
+
+  /// Check if this is an image message
+  bool get isImage => messageType == MessageType.image && imageUrl != null;
 
   /// Create from entity
   factory MessageModel.fromEntity(MessageEntity entity) {
@@ -55,93 +134,31 @@ class MessageModel extends MessageEntity {
       tokensUsed: entity.tokensUsed,
       messageType: entity.messageType,
       imageUrl: entity.imageUrl,
+      userId: entity.userId,
     );
   }
 
-  /// Create user message
-  factory MessageModel.user({
-    required String content,
-    String? id,
-  }) {
+  /// Create from Firestore document
+  factory MessageModel.fromFirestore(Map<String, dynamic> data, String id) {
     return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: content,
-      role: MessageRole.user,
-      timestamp: DateTime.now(),
+      id: id,
+      content: data['content'] ?? data['text'] ?? '',
+      role: _parseRole(data['role'] ?? 'user'),
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ??
+          (data['createdAt'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
+      isError: data['isError'] ?? false,
+      tokensUsed: data['tokensUsed'],
+      messageType: _parseMessageType(data['type'] ?? data['messageType'] ?? 'text'),
+      imageUrl: data['imageUrl'],
+      userId: data['userId'],
     );
   }
 
-  /// Create assistant message
-  factory MessageModel.assistant({
-    required String content,
-    String? id,
-    int? tokensUsed,
-  }) {
-    return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: content,
-      role: MessageRole.assistant,
-      timestamp: DateTime.now(),
-      tokensUsed: tokensUsed,
-    );
-  }
-  
-  /// Create selfie request message (user asking for selfie)
-  factory MessageModel.selfieRequest({String? id}) {
-    return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: 'Send me a selfie! 📸',
-      role: MessageRole.user,
-      timestamp: DateTime.now(),
-      messageType: MessageType.selfieRequest,
-    );
-  }
-  
-  /// Create selfie loading message (while generating)
-  factory MessageModel.selfieLoading({String? id}) {
-    return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: 'Taking a selfie for you... 📸',
-      role: MessageRole.assistant,
-      timestamp: DateTime.now(),
-      messageType: MessageType.selfieLoading,
-    );
-  }
-  
-  /// Create image message (selfie response)
-  factory MessageModel.image({
-    required String imageUrl,
-    String? caption,
-    String? id,
-  }) {
-    return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: caption ?? 'Here\'s a selfie for you! 💕📸',
-      role: MessageRole.assistant,
-      timestamp: DateTime.now(),
-      messageType: MessageType.image,
-      imageUrl: imageUrl,
-    );
-  }
-
-  /// Create error message
-  factory MessageModel.error({
-    required String content,
-    String? id,
-  }) {
-    return MessageModel(
-      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      content: content,
-      role: MessageRole.assistant,
-      timestamp: DateTime.now(),
-      isError: true,
-    );
-  }
-
-  /// Convert to JSON (for API request)
+  /// Convert to JSON (for API requests)
   Map<String, dynamic> toJson() {
     return {
-      'role': _roleToString(role),
+      'role': role.name,
       'content': content,
     };
   }
@@ -150,12 +167,13 @@ class MessageModel extends MessageEntity {
   Map<String, dynamic> toFirestore() {
     return {
       'content': content,
-      'role': _roleToString(role),
+      'role': role.name,
       'timestamp': Timestamp.fromDate(timestamp),
       'isError': isError,
       'tokensUsed': tokensUsed,
-      'messageType': _messageTypeToString(messageType),
+      'type': messageType.name,
       'imageUrl': imageUrl,
+      'userId': userId,
     };
   }
 
@@ -170,36 +188,11 @@ class MessageModel extends MessageEntity {
       tokensUsed: tokensUsed,
       messageType: messageType,
       imageUrl: imageUrl,
+      userId: userId,
     );
   }
-  
-  static MessageType _parseMessageType(String? type) {
-    if (type == null) return MessageType.text;
-    switch (type.toLowerCase()) {
-      case 'image':
-        return MessageType.image;
-      case 'selfierequest':
-        return MessageType.selfieRequest;
-      case 'selfieloading':
-        return MessageType.selfieLoading;
-      default:
-        return MessageType.text;
-    }
-  }
-  
-  static String _messageTypeToString(MessageType type) {
-    switch (type) {
-      case MessageType.text:
-        return 'text';
-      case MessageType.image:
-        return 'image';
-      case MessageType.selfieRequest:
-        return 'selfieRequest';
-      case MessageType.selfieLoading:
-        return 'selfieLoading';
-    }
-  }
 
+  /// Parse role from string
   static MessageRole _parseRole(String role) {
     switch (role.toLowerCase()) {
       case 'user':
@@ -209,45 +202,102 @@ class MessageModel extends MessageEntity {
       case 'system':
         return MessageRole.system;
       default:
-        return MessageRole.assistant;
+        return MessageRole.user;
     }
   }
 
-  static String _roleToString(MessageRole role) {
-    switch (role) {
-      case MessageRole.user:
-        return 'user';
-      case MessageRole.assistant:
-        return 'assistant';
-      case MessageRole.system:
-        return 'system';
+  /// Parse message type from string
+  static MessageType _parseMessageType(String type) {
+    switch (type.toLowerCase()) {
+      case 'text':
+        return MessageType.text;
+      case 'image':
+        return MessageType.image;
+      case 'selfierequest':
+      case 'selfie_request':
+        return MessageType.selfieRequest;
+      case 'selfieloading':
+      case 'selfie_loading':
+        return MessageType.selfieLoading;
+      default:
+        return MessageType.text;
     }
+  }
+
+  MessageModel copyWith({
+    String? id,
+    String? content,
+    MessageRole? role,
+    DateTime? timestamp,
+    bool? isError,
+    int? tokensUsed,
+    MessageType? messageType,
+    String? imageUrl,
+    String? userId,
+  }) {
+    return MessageModel(
+      id: id ?? this.id,
+      content: content ?? this.content,
+      role: role ?? this.role,
+      timestamp: timestamp ?? this.timestamp,
+      isError: isError ?? this.isError,
+      tokensUsed: tokensUsed ?? this.tokensUsed,
+      messageType: messageType ?? this.messageType,
+      imageUrl: imageUrl ?? this.imageUrl,
+      userId: userId ?? this.userId,
+    );
   }
 }
 
-/// Conversation model - Data layer representation
-class ConversationModel extends ConversationEntity {
+/// Conversation Model - Data layer representation of ConversationEntity
+class ConversationModel {
+  final String id;
+  final String userId;
+  final String characterId;
+  final String? title;
+  final List<MessageModel> messages;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? lastMessageContent;
+  final DateTime? lastMessageTimestamp;
+  final int unreadCount;
+  final String? characterName;
+  final String? characterAvatar;
+
   const ConversationModel({
-    required super.id,
-    required super.userId,
-    required super.characterId,
-    super.title,
-    required super.messages,
-    required super.createdAt,
-    required super.updatedAt,
+    required this.id,
+    required this.userId,
+    required this.characterId,
+    this.title,
+    required this.messages,
+    required this.createdAt,
+    required this.updatedAt,
+    this.lastMessageContent,
+    this.lastMessageTimestamp,
+    this.unreadCount = 0,
+    this.characterName,
+    this.characterAvatar,
   });
 
-  /// Create from Firestore document
-  factory ConversationModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  /// Factory constructor to create a new conversation
+  factory ConversationModel.create({
+    required String id,
+    required String userId,
+    required String characterId,
+    String? title,
+    String? characterName,
+    String? characterAvatar,
+  }) {
     return ConversationModel(
-      id: doc.id,
-      userId: data['userId'] ?? '',
-      characterId: data['characterId'] ?? '',
-      title: data['title'],
-      messages: [], // Messages loaded separately
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      id: id,
+      userId: userId,
+      characterId: characterId,
+      title: title,
+      messages: [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      characterName: characterName,
+      characterAvatar: characterAvatar,
     );
   }
 
@@ -258,28 +308,34 @@ class ConversationModel extends ConversationEntity {
       userId: entity.userId,
       characterId: entity.characterId,
       title: entity.title,
-      messages: entity.messages,
+      messages: entity.messages.map((m) => MessageModel.fromEntity(m)).toList(),
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
+      lastMessageContent: entity.lastMessageContent,
+      lastMessageTimestamp: entity.lastMessageTimestamp,
+      unreadCount: entity.unreadCount,
+      characterName: entity.characterName,
+      characterAvatar: entity.characterAvatar,
     );
   }
 
-  /// Create new conversation with a character
-  factory ConversationModel.create({
-    required String id,
-    required String userId,
-    required String characterId,
-    String? title,
-  }) {
-    final now = DateTime.now();
+  /// Create from Firestore document
+  factory ConversationModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    
     return ConversationModel(
-      id: id,
-      userId: userId,
-      characterId: characterId,
-      title: title,
-      messages: const [],
-      createdAt: now,
-      updatedAt: now,
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      characterId: data['characterId'] ?? '',
+      title: data['title'],
+      messages: [], // Messages are loaded separately
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastMessageContent: data['lastMessage'] ?? data['lastMessageContent'],
+      lastMessageTimestamp: (data['lastMessageTimestamp'] as Timestamp?)?.toDate(),
+      unreadCount: data['unreadCount'] ?? 0,
+      characterName: data['characterName'],
+      characterAvatar: data['characterAvatar'],
     );
   }
 
@@ -291,6 +347,13 @@ class ConversationModel extends ConversationEntity {
       'title': title,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'lastMessage': lastMessageContent,
+      'lastMessageTimestamp': lastMessageTimestamp != null
+          ? Timestamp.fromDate(lastMessageTimestamp!)
+          : null,
+      'unreadCount': unreadCount,
+      'characterName': characterName,
+      'characterAvatar': characterAvatar,
     };
   }
 
@@ -301,21 +364,30 @@ class ConversationModel extends ConversationEntity {
       userId: userId,
       characterId: characterId,
       title: title,
-      messages: messages,
+      messages: messages.map((m) => m.toEntity()).toList(),
       createdAt: createdAt,
       updatedAt: updatedAt,
+      lastMessageContent: lastMessageContent,
+      lastMessageTimestamp: lastMessageTimestamp,
+      unreadCount: unreadCount,
+      characterName: characterName,
+      characterAvatar: characterAvatar,
     );
   }
 
-  @override
   ConversationModel copyWith({
     String? id,
     String? userId,
     String? characterId,
     String? title,
-    List<MessageEntity>? messages,
+    List<MessageModel>? messages,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? lastMessageContent,
+    DateTime? lastMessageTimestamp,
+    int? unreadCount,
+    String? characterName,
+    String? characterAvatar,
   }) {
     return ConversationModel(
       id: id ?? this.id,
@@ -325,7 +397,11 @@ class ConversationModel extends ConversationEntity {
       messages: messages ?? this.messages,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastMessageContent: lastMessageContent ?? this.lastMessageContent,
+      lastMessageTimestamp: lastMessageTimestamp ?? this.lastMessageTimestamp,
+      unreadCount: unreadCount ?? this.unreadCount,
+      characterName: characterName ?? this.characterName,
+      characterAvatar: characterAvatar ?? this.characterAvatar,
     );
   }
 }
-

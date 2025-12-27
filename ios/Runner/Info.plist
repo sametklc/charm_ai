@@ -52,5 +52,15 @@
     </array>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Uygulamanın hata ayıklama (debug) yapabilmesi için yerel ağ izni gereklidir.</string>
+
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.84771592082</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

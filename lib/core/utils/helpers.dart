@@ -60,5 +60,20 @@ class Helpers {
     if (text.length <= maxLength) return text;
     return '${text.substring(0, maxLength)}...';
   }
+
+  /// Fix avatar/image URL by adding https:// prefix if missing
+  /// This prevents "Invalid argument(s): No host specified in URI" errors
+  static String fixImageUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    
+    // If URL already has http:// or https://, return as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    // Add https:// prefix if missing
+    return 'https://$url';
+  }
 }
+
 

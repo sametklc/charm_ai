@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/errors/failures.dart';
 import '../entities/user_entity.dart';
 
@@ -40,9 +41,11 @@ abstract class AuthRepository {
   Future<Either<Failure, UserEntity>> updateProfile({
     String? displayName,
     String? photoUrl,
+    XFile? photoFile,
   });
 
   /// Delete user account
   Future<Either<Failure, void>> deleteAccount();
 }
+
 

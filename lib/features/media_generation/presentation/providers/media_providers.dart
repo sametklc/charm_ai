@@ -92,3 +92,5 @@ final selectedModelProvider = StateProvider<String>((ref) => 'flux-schnell');
 /// Current aspect ratio selection
 final selectedAspectRatioProvider = StateProvider<String>((ref) => '1:1');
 
+
+

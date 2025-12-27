@@ -26,3 +26,5 @@ class CharacterParams extends Equatable {
   List<Object?> get props => [characterId];
 }
 
+
+

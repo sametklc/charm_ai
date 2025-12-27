@@ -29,3 +29,5 @@ abstract class MediaRepository {
   Future<Either<Failure, List<GeneratedMediaEntity>>> getFavoriteMedia(String userId);
 }
 
+
+

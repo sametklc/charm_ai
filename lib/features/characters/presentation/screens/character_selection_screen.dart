@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../chat/presentation/providers/chat_providers.dart';
 import '../../domain/entities/character_entity.dart';
 import '../../data/repositories/predefined_characters.dart';
 import '../providers/character_provider.dart';
 
 /// Character Selection Screen - Tinder-style swipeable cards
 class CharacterSelectionScreen extends ConsumerStatefulWidget {
-  const CharacterSelectionScreen({super.key});
+  final bool isEmbedded;
+  
+  const CharacterSelectionScreen({super.key, this.isEmbedded = false});
 
   @override
   ConsumerState<CharacterSelectionScreen> createState() =>
@@ -21,6 +25,7 @@ class _CharacterSelectionScreenState
     with TickerProviderStateMixin {
   late PageController _pageController;
   int _currentIndex = 0;
+  bool _isStartingChat = false;
 
   @override
   void initState() {
@@ -34,9 +39,48 @@ class _CharacterSelectionScreenState
     super.dispose();
   }
 
-  void _selectCharacter(CharacterEntity character) {
-    ref.read(selectedCharacterProvider.notifier).state = character;
-    Navigator.pushReplacementNamed(context, '/chat', arguments: character);
+  Future<void> _selectCharacter(CharacterEntity character) async {
+    if (_isStartingChat) return;
+    
+    setState(() => _isStartingChat = true);
+    
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      setState(() => _isStartingChat = false);
+      return;
+    }
+    
+    try {
+      // Check if conversation already exists with this character
+      final getOrCreateConversation = ref.read(getOrCreateConversationUseCaseProvider);
+      final result = await getOrCreateConversation(
+        userId: user.uid,
+        characterId: character.id,
+      );
+      
+      result.fold(
+        (failure) {
+          // Show error
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: ${failure.message}')),
+            );
+          }
+        },
+        (conversation) {
+          // Set selected character and navigate
+          ref.read(selectedCharacterProvider.notifier).state = character;
+          
+          if (mounted) {
+            Navigator.pushNamed(context, '/chat', arguments: character);
+          }
+        },
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingChat = false);
+      }
+    }
   }
 
   @override
@@ -119,6 +163,7 @@ class _CharacterSelectionScreenState
                                 character: characters[index],
                                 onSelect: () => _selectCharacter(characters[index]),
                                 isActive: index == _currentIndex,
+                                isLoading: _isStartingChat,
                               ),
                             ),
                           );
@@ -233,11 +278,13 @@ class _CharacterCard extends StatelessWidget {
   final CharacterEntity character;
   final VoidCallback onSelect;
   final bool isActive;
+  final bool isLoading;
 
   const _CharacterCard({
     required this.character,
     required this.onSelect,
     required this.isActive,
+    this.isLoading = false,
   });
 
   @override
@@ -300,44 +347,6 @@ class _CharacterCard extends StatelessWidget {
               ),
             ),
 
-            // Premium Badge
-            if (character.isPremium)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withOpacity(0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.star, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'PREMIUM',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
             // Content
             Positioned(
@@ -416,7 +425,7 @@ class _CharacterCard extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          _getTraitEmoji(trait) + ' ' + _formatTrait(trait),
+                          '${_getTraitEmoji(trait)} ${_formatTrait(trait)}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Colors.white,
@@ -432,7 +441,7 @@ class _CharacterCard extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: onSelect,
+                      onPressed: isLoading ? null : onSelect,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -442,20 +451,29 @@ class _CharacterCard extends StatelessWidget {
                         ),
                         elevation: 0,
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.chat_bubble_rounded, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Start Chatting',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.chat_bubble_rounded, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Start Chatting',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ],
@@ -522,4 +540,3 @@ class CharacterAnimatedBuilder extends AnimatedWidget {
     return builder(context, null);
   }
 }
-

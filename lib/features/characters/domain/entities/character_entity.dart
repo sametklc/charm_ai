@@ -66,12 +66,15 @@ class CharacterEntity extends Equatable {
     this.physicalDescription = '',
   });
   
-  /// Generate selfie prompt for image generation
+  /// Generate photo prompt for image generation (portrait from different angles)
   String get selfiePrompt {
+    final angles = ['portrait', 'three-quarter view', 'side profile', 'looking slightly away'];
+    final randomAngle = angles[DateTime.now().millisecondsSinceEpoch % angles.length];
+    
     if (physicalDescription.isEmpty) {
-      return 'A beautiful selfie photo of a young woman, smiling warmly at camera, natural lighting, high quality, 4k, realistic';
+      return 'A beautiful professional portrait photo of a young woman, $randomAngle, medium shot (waist-up), warm smile, natural lighting, high quality, 4k, realistic photography, elegant pose';
     }
-    return 'A selfie photo of $physicalDescription, looking at camera with a warm smile, natural lighting, high quality, 4k, realistic, Instagram style';
+    return 'A professional portrait photo of $physicalDescription, $randomAngle, medium shot (waist-up), warm smile, natural lighting, high quality, 4k, realistic photography, elegant pose, not too far away';
   }
 
   /// Get primary trait

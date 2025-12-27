@@ -22,11 +22,7 @@ class ImageBubble extends StatelessWidget {
     final isUser = message.isUser;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: isUser ? 48 : 0,
-        right: isUser ? 0 : 48,
-        bottom: 12,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Column(
         crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
@@ -239,15 +235,15 @@ class _SelfieLoadingBubbleState extends State<SelfieLoadingBubble>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 48, bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: AnimatedBuilder(
-        listenable: _controller,
+        animation: _controller,
         builder: (context, child) {
           return Transform.scale(
             scale: _pulseAnimation.value,
             child: Container(
-              width: 200,
-              height: 200,
+              width: MediaQuery.of(context).size.width * 0.6, // Screen width * 0.6
+              height: 150,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.surfaceDark : AppColors.surface,
                 borderRadius: const BorderRadius.only(
@@ -308,19 +304,4 @@ class _SelfieLoadingBubbleState extends State<SelfieLoadingBubble>
   }
 }
 
-/// AnimatedBuilder helper widget
-class AnimatedBuilder extends AnimatedWidget {
-  final Widget Function(BuildContext, Widget?) builder;
-
-  const AnimatedBuilder({
-    super.key,
-    required Listenable listenable,
-    required this.builder,
-  }) : super(listenable: listenable);
-
-  @override
-  Widget build(BuildContext context) {
-    return builder(context, null);
-  }
-}
 

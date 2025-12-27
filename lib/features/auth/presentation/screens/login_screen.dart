@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -35,12 +36,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    print('🔵 LoginScreen: Starting email sign in...');
     final success = await ref.read(authControllerProvider.notifier).signInWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
-    if (!success && mounted) {
+    if (success && mounted) {
+      print('✅ LoginScreen: Email sign in success - AuthWrapper will handle navigation automatically');
+      // DO NOT manually navigate - AuthWrapper listens to authStateProvider and will automatically navigate
+      // Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } else if (!success && mounted) {
+      print('❌ LoginScreen: Email sign in failed');
       final errorMessage = ref.read(authControllerProvider).errorMessage;
       if (errorMessage != null) {
         Helpers.showSnackBar(context, errorMessage, isError: true);
@@ -49,9 +56,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleGoogleSignIn() async {
+    print('🔵 LoginScreen: Starting Google sign in...');
     final success = await ref.read(authControllerProvider.notifier).signInWithGoogle();
 
-    if (!success && mounted) {
+    if (success && mounted) {
+      print('✅ LoginScreen: Google sign in success - AuthWrapper will handle navigation automatically');
+      // DO NOT manually navigate - AuthWrapper listens to authStateProvider and will automatically navigate
+      // Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } else if (!success && mounted) {
+      print('❌ LoginScreen: Google sign in failed');
       final errorMessage = ref.read(authControllerProvider).errorMessage;
       if (errorMessage != null) {
         Helpers.showSnackBar(context, errorMessage, isError: true);
@@ -60,9 +73,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleAppleSignIn() async {
+    print('🔵 LoginScreen: Starting Apple sign in...');
     final success = await ref.read(authControllerProvider.notifier).signInWithApple();
 
-    if (!success && mounted) {
+    if (success && mounted) {
+      print('✅ LoginScreen: Apple sign in success - AuthWrapper will handle navigation automatically');
+      // DO NOT manually navigate - AuthWrapper listens to authStateProvider and will automatically navigate
+      // Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } else if (!success && mounted) {
+      print('❌ LoginScreen: Apple sign in failed');
       final errorMessage = ref.read(authControllerProvider).errorMessage;
       if (errorMessage != null) {
         Helpers.showSnackBar(context, errorMessage, isError: true);
@@ -234,15 +253,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         isLoading: isLoading,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: SocialAuthButton(
-                        text: 'Apple',
-                        iconData: Icons.apple,
-                        onPressed: _handleAppleSignIn,
-                        isLoading: isLoading,
+                    // Apple Sign In only available on iOS
+                    if (Platform.isIOS) ...[
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SocialAuthButton(
+                          text: 'Apple',
+                          iconData: Icons.apple,
+                          onPressed: _handleAppleSignIn,
+                          isLoading: isLoading,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 32),
@@ -284,4 +306,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
+
 

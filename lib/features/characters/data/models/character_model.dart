@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/utils/helpers.dart';
 import '../../domain/entities/character_entity.dart';
 
 /// Character model - Data layer representation
@@ -24,6 +25,12 @@ class CharacterModel extends CharacterEntity {
 
   /// Create from JSON
   factory CharacterModel.fromJson(Map<String, dynamic> json) {
+    // Fix avatar URLs by adding https:// prefix if missing
+    final avatarUrl = Helpers.fixImageUrl(json['avatarUrl']?.toString() ?? '');
+    final coverImageUrl = json['coverImageUrl'] != null 
+        ? Helpers.fixImageUrl(json['coverImageUrl']?.toString())
+        : null;
+    
     return CharacterModel(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -31,8 +38,8 @@ class CharacterModel extends CharacterEntity {
       shortBio: json['shortBio'] ?? '',
       personalityDescription: json['personalityDescription'] ?? '',
       systemPrompt: json['systemPrompt'] ?? '',
-      avatarUrl: json['avatarUrl'] ?? '',
-      coverImageUrl: json['coverImageUrl'],
+      avatarUrl: avatarUrl,
+      coverImageUrl: coverImageUrl,
       voiceStyle: _parseVoiceStyle(json['voiceStyle']),
       traits: _parseTraits(json['traits']),
       interests: List<String>.from(json['interests'] ?? []),

@@ -21,29 +21,38 @@ class ChatRepositoryImpl implements ChatRepository {
     required List<MessageEntity> history,
     String? systemPrompt,
   }) async {
+    print('🔵 ChatRepository: sendMessage called for conversationId: $conversationId');
+    print('🔵 ChatRepository: Message length: ${message.length}, history length: ${history.length}');
+
     try {
-      // Create and save user message
-      final userMessage = MessageModel.user(content: message);
-      await remoteDataSource.saveMessage(conversationId, userMessage);
+      // NOTE: User message is already saved by ChatController
+      // Here we only get the AI response
 
       // Get AI response with character's system prompt
+      print('🔵 ChatRepository: Getting AI response...');
       final response = await remoteDataSource.sendMessage(
         message: message,
         history: history,
         systemPrompt: systemPrompt,
       );
+      print('✅ ChatRepository: AI response received');
 
-      // Save AI response
-      await remoteDataSource.saveMessage(conversationId, response);
+      // NOTE: AI response will be saved by ChatController
+      // We just return it here
 
       return Right(response.toEntity());
     } on NetworkException catch (e) {
+      print('❌ ChatRepository: NetworkException: ${e.message}');
       return Left(NetworkFailure(message: e.message));
     } on ServerException catch (e) {
+      print('❌ ChatRepository: ServerException: ${e.message}');
       return Left(ServerFailure(message: e.message, code: e.statusCode));
     } on AIGenerationException catch (e) {
+      print('❌ ChatRepository: AIGenerationException: ${e.message}');
       return Left(AIGenerationFailure(message: e.message, modelName: e.modelName));
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ ChatRepository: Unexpected error: $e');
+      print('Stack trace: $stackTrace');
       return Left(ServerFailure(message: 'Failed to send message: ${e.toString()}'));
     }
   }
@@ -56,24 +65,19 @@ class ChatRepositoryImpl implements ChatRepository {
     String? systemPrompt,
   }) async* {
     try {
-      // Create and save user message
-      final userMessage = MessageModel.user(content: message);
-      await remoteDataSource.saveMessage(conversationId, userMessage);
+      // NOTE: User message is already saved by ChatController
+      // Here we only stream the AI response
 
       // Stream AI response with character's system prompt
-      String fullResponse = '';
       await for (final chunk in remoteDataSource.sendMessageStream(
         message: message,
         history: history,
         systemPrompt: systemPrompt,
       )) {
-        fullResponse += chunk;
         yield Right(chunk);
       }
 
-      // Save complete AI response
-      final assistantMessage = MessageModel.assistant(content: fullResponse);
-      await remoteDataSource.saveMessage(conversationId, assistantMessage);
+      // NOTE: Complete AI response will be saved by ChatController
     } on NetworkException catch (e) {
       yield Left(NetworkFailure(message: e.message));
     } on ServerException catch (e) {
@@ -136,6 +140,18 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Future<Either<Failure, void>> deleteAllUserConversations(String userId) async {
+    try {
+      await remoteDataSource.deleteAllUserConversations(userId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: 'Failed to delete all conversations'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<ConversationEntity>>> getUserCharacterConversations(
     String userId,
     String characterId,
@@ -158,22 +174,39 @@ class ChatRepositoryImpl implements ChatRepository {
     required String userId,
     required String characterId,
     String? title,
+    String? characterName,
+    String? characterAvatar,
   }) async {
+    print('🔵 ChatRepository: createConversation called');
+    print('🔵 ChatRepository: userId: $userId, characterId: $characterId, title: $title');
+    print('🔵 ChatRepository: characterName: $characterName, characterAvatar: $characterAvatar');
+    
     try {
       final conversationId = _uuid.v4();
+      print('🔵 ChatRepository: Generated conversationId: $conversationId');
+      
       final conversation = ConversationModel.create(
         id: conversationId,
         userId: userId,
         characterId: characterId,
         title: title,
+        characterName: characterName,
+        characterAvatar: characterAvatar,
       );
+      print('✅ ChatRepository: ConversationModel created');
 
+      print('🔵 ChatRepository: Saving conversation to Firestore...');
       await remoteDataSource.saveConversation(conversation);
+      print('✅ ChatRepository: Conversation saved successfully');
+      
       return Right(conversation.toEntity());
     } on ServerException catch (e) {
+      print('❌ ChatRepository: ServerException creating conversation: ${e.message}');
       return Left(ServerFailure(message: e.message));
-    } catch (e) {
-      return Left(ServerFailure(message: 'Failed to create conversation'));
+    } catch (e, stackTrace) {
+      print('❌ ChatRepository: Error creating conversation: $e');
+      print('Stack trace: $stackTrace');
+      return Left(ServerFailure(message: 'Failed to create conversation: $e'));
     }
   }
 }

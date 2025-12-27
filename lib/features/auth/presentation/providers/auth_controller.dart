@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../domain/usecases/register_usecase.dart';
 import '../../domain/usecases/reset_password_usecase.dart';
 import '../../domain/usecases/sign_in_usecase.dart';
 import '../../domain/usecases/sign_out_usecase.dart';
+import '../../domain/usecases/update_profile_usecase.dart';
 import 'auth_providers.dart';
 
 /// Auth state for the controller
@@ -43,6 +45,7 @@ class AuthController extends StateNotifier<AuthState> {
   final RegisterUseCase _registerUseCase;
   final SignOutUseCase _signOutUseCase;
   final ResetPasswordUseCase _resetPasswordUseCase;
+  final UpdateProfileUseCase _updateProfileUseCase;
 
   AuthController({
     required SignInUseCase signInUseCase,
@@ -51,12 +54,14 @@ class AuthController extends StateNotifier<AuthState> {
     required RegisterUseCase registerUseCase,
     required SignOutUseCase signOutUseCase,
     required ResetPasswordUseCase resetPasswordUseCase,
+    required UpdateProfileUseCase updateProfileUseCase,
   })  : _signInUseCase = signInUseCase,
         _signInWithGoogleUseCase = signInWithGoogleUseCase,
         _signInWithAppleUseCase = signInWithAppleUseCase,
         _registerUseCase = registerUseCase,
         _signOutUseCase = signOutUseCase,
         _resetPasswordUseCase = resetPasswordUseCase,
+        _updateProfileUseCase = updateProfileUseCase,
         super(const AuthState());
 
   /// Sign in with email and password
@@ -64,23 +69,36 @@ class AuthController extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
+    print('🔵 AuthController: signInWithEmail START for $email');
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
 
-    final result = await _signInUseCase(email: email, password: password);
+    try {
+      final result = await _signInUseCase(email: email, password: password);
 
-    return result.fold(
-      (failure) {
-        state = state.copyWith(
-          status: AuthStatus.error,
-          errorMessage: failure.message,
-        );
-        return false;
-      },
-      (user) {
-        state = state.copyWith(status: AuthStatus.authenticated);
-        return true;
-      },
-    );
+      return result.fold(
+        (failure) {
+          print('❌ AuthController: Sign in FAILED: ${failure.message}');
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: failure.message,
+          );
+          return false;
+        },
+        (user) {
+          print('✅ AuthController: Sign in SUCCESS for user: ${user.uid}');
+          state = state.copyWith(status: AuthStatus.authenticated);
+          return true;
+        },
+      );
+    } catch (e, stackTrace) {
+      print('❌ AuthController: Unexpected error during signInWithEmail: $e');
+      print('Stack trace: $stackTrace');
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'An unexpected error occurred: ${e.toString()}',
+      );
+      return false;
+    }
   }
 
   /// Sign in with Google
@@ -158,12 +176,14 @@ class AuthController extends StateNotifier<AuthState> {
 
   /// Sign out
   Future<bool> signOut() async {
+    print('🔵 AuthController: signOut START');
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
 
     final result = await _signOutUseCase();
 
     return result.fold(
       (failure) {
+        print('❌ AuthController: signOut FAILED: ${failure.message}');
         state = state.copyWith(
           status: AuthStatus.error,
           errorMessage: failure.message,
@@ -171,6 +191,8 @@ class AuthController extends StateNotifier<AuthState> {
         return false;
       },
       (_) {
+        print('✅ AuthController: signOut SUCCESS - State set to unauthenticated');
+        // CRITICAL: Set to unauthenticated so AuthWrapper shows LoginScreen
         state = state.copyWith(status: AuthStatus.unauthenticated);
         return true;
       },
@@ -198,6 +220,36 @@ class AuthController extends StateNotifier<AuthState> {
     );
   }
 
+  /// Update user profile
+  Future<bool> updateProfile({
+    String? displayName,
+    XFile? photoFile,
+  }) async {
+    print('🔵 AuthController: updateProfile START');
+    state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
+
+    final result = await _updateProfileUseCase(
+      displayName: displayName,
+      photoFile: photoFile,
+    );
+
+    return result.fold(
+      (failure) {
+        print('❌ AuthController: Update profile FAILED: ${failure.message}');
+        state = state.copyWith(
+          status: AuthStatus.initial,
+          errorMessage: failure.message,
+        );
+        return false;
+      },
+      (user) {
+        print('✅ AuthController: Update profile SUCCESS for user: ${user.uid}');
+        state = state.copyWith(status: AuthStatus.initial);
+        return true;
+      },
+    );
+  }
+
   /// Clear error
   void clearError() {
     state = state.copyWith(errorMessage: null);
@@ -218,6 +270,8 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
     registerUseCase: ref.watch(registerUseCaseProvider),
     signOutUseCase: ref.watch(signOutUseCaseProvider),
     resetPasswordUseCase: ref.watch(resetPasswordUseCaseProvider),
+    updateProfileUseCase: ref.watch(updateProfileUseCaseProvider),
   );
 });
+
 

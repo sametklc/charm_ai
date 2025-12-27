@@ -96,3 +96,5 @@ final characterListStateProvider =
   return CharacterListNotifier(ref);
 });
 
+
+

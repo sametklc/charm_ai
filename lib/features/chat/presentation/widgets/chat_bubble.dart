@@ -212,7 +212,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      listenable: _controller,
+      animation: _controller,
       builder: (context, child) {
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -261,21 +261,5 @@ class LoadingBubble extends StatelessWidget {
         child: const _TypingIndicator(),
       ),
     );
-  }
-}
-
-/// AnimatedBuilder helper widget
-class AnimatedBuilder extends AnimatedWidget {
-  final Widget Function(BuildContext, Widget?) builder;
-
-  const AnimatedBuilder({
-    super.key,
-    required Listenable listenable,
-    required this.builder,
-  }) : super(listenable: listenable);
-
-  @override
-  Widget build(BuildContext context) {
-    return builder(context, null);
   }
 }

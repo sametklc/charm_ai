@@ -9,6 +9,7 @@ class ChatInput extends StatefulWidget {
   final bool isSelfieLoading;
   final bool enabled;
   final String? hintText;
+  final FocusNode? focusNode;
 
   const ChatInput({
     super.key,
@@ -18,28 +19,52 @@ class ChatInput extends StatefulWidget {
     this.isSelfieLoading = false,
     this.enabled = true,
     this.hintText,
+    this.focusNode,
   });
 
   @override
-  State<ChatInput> createState() => _ChatInputState();
+  State<ChatInput> createState() => ChatInputState();
 }
 
-class _ChatInputState extends State<ChatInput> {
+class ChatInputState extends State<ChatInput> {
   final _controller = TextEditingController();
-  final _focusNode = FocusNode();
+  late final FocusNode _focusNode;
   bool _hasText = false;
+  bool _isOwnFocusNode = false;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onTextChanged);
+    
+    // Use provided focusNode or create our own
+    if (widget.focusNode != null) {
+      _focusNode = widget.focusNode!;
+      _isOwnFocusNode = false;
+    } else {
+      _focusNode = FocusNode();
+      _isOwnFocusNode = true;
+    }
+  }
+
+  /// Public method to prefill text and focus
+  void prefillPhotoRequest() {
+    const prefix = '📸 Describe photo: ';
+    _controller.text = prefix;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: prefix.length),
+    );
+    _focusNode.requestFocus();
   }
 
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
-    _focusNode.dispose();
+    // Only dispose if we created our own focusNode
+    if (_isOwnFocusNode) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 
@@ -61,7 +86,8 @@ class _ChatInputState extends State<ChatInput> {
 
   void _handleSelfieRequest() {
     if (widget.isLoading || widget.isSelfieLoading || !widget.enabled) return;
-    widget.onRequestSelfie?.call();
+    // Prefill text input with photo request prefix instead of immediately generating
+    prefillPhotoRequest();
   }
 
   @override
@@ -86,44 +112,32 @@ class _ChatInputState extends State<ChatInput> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Camera/Selfie Button
-            if (widget.onRequestSelfie != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Material(
-                  color: widget.isSelfieLoading
-                      ? AppColors.secondary
-                      : (isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant),
+            // Camera/Photo Request Button
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Material(
+                color: isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  onTap: !anyLoading && widget.enabled ? _handleSelfieRequest : null,
                   borderRadius: BorderRadius.circular(24),
-                  child: InkWell(
-                    onTap: !anyLoading && widget.enabled ? _handleSelfieRequest : null,
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      alignment: Alignment.center,
-                      child: widget.isSelfieLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Icon(
-                              Icons.camera_alt_rounded,
-                              color: widget.enabled && !anyLoading
-                                  ? AppColors.secondary
-                                  : (isDark
-                                      ? AppColors.textTertiaryDark
-                                      : AppColors.textTertiary),
-                              size: 24,
-                            ),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: widget.enabled && !anyLoading
+                          ? AppColors.secondary
+                          : (isDark
+                              ? AppColors.textTertiaryDark
+                              : AppColors.textTertiary),
+                      size: 24,
                     ),
                   ),
                 ),
               ),
+            ),
               
             // Text Field
             Expanded(

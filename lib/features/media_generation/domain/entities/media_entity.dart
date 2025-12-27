@@ -118,6 +118,7 @@ class ImageGenerationParams extends Equatable {
   final double guidanceScale;
   final int numInferenceSteps;
   final int? seed;
+  final String? referenceImageUrl; // Reference image for identity preservation (img2img)
 
   const ImageGenerationParams({
     required this.prompt,
@@ -129,6 +130,7 @@ class ImageGenerationParams extends Equatable {
     this.guidanceScale = 7.5,
     this.numInferenceSteps = 28,
     this.seed,
+    this.referenceImageUrl,
   });
 
   Map<String, dynamic> toJson() {
@@ -142,6 +144,7 @@ class ImageGenerationParams extends Equatable {
       'guidance_scale': guidanceScale,
       'num_inference_steps': numInferenceSteps,
       if (seed != null) 'seed': seed,
+      if (referenceImageUrl != null) 'reference_image_url': referenceImageUrl,
     };
   }
 
@@ -156,6 +159,9 @@ class ImageGenerationParams extends Equatable {
         guidanceScale,
         numInferenceSteps,
         seed,
+        referenceImageUrl,
       ];
 }
+
+
 

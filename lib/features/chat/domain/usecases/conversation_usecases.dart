@@ -101,3 +101,71 @@ class DeleteConversationUseCase {
   }
 }
 
+/// Use case for deleting all conversations for a user
+class DeleteAllConversationsUseCase {
+  final ChatRepository repository;
+
+  DeleteAllConversationsUseCase(this.repository);
+
+  Future<Either<Failure, void>> call(String userId) async {
+    if (userId.isEmpty) {
+      return const Left(ValidationFailure(message: 'User ID is required'));
+    }
+    return await repository.deleteAllUserConversations(userId);
+  }
+}
+
+/// Use case for getting or creating a conversation with a character
+/// Returns existing conversation if found, otherwise creates a new one
+class GetOrCreateConversationUseCase {
+  final ChatRepository repository;
+
+  GetOrCreateConversationUseCase(this.repository);
+
+  Future<Either<Failure, ConversationEntity>> call({
+    required String userId,
+    required String characterId,
+    String? characterName,
+    String? characterAvatar,
+  }) async {
+    if (userId.isEmpty) {
+      return const Left(ValidationFailure(message: 'User ID is required'));
+    }
+    if (characterId.isEmpty) {
+      return const Left(ValidationFailure(message: 'Character ID is required'));
+    }
+    
+    // First, try to get existing conversation with this character
+    print('GetOrCreateConversation: Looking for existing conversations with userId=$userId, characterId=$characterId');
+    final existingResult = await repository.getUserCharacterConversations(userId, characterId);
+
+    // Check if we got existing conversations
+    if (existingResult.isRight()) {
+      final conversations = existingResult.getOrElse(() => []);
+      print('GetOrCreateConversation: Found ${conversations.length} existing conversations');
+      if (conversations.isNotEmpty) {
+        // Sort by updatedAt descending to get the most recent conversation
+        conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        print('GetOrCreateConversation: Using existing conversation ${conversations.first.id} from ${conversations.first.updatedAt}');
+        return Right(conversations.first);
+      }
+    } else {
+      existingResult.fold(
+        (failure) => print('GetOrCreateConversation: Error getting existing conversations: ${failure.message}'),
+        (success) => print('GetOrCreateConversation: Unexpected success in error case'),
+      );
+    }
+    
+    print('GetOrCreateConversation: No existing conversation found, creating new one');
+    
+    // No existing conversation (or error), create a new one
+    return await repository.createConversation(
+      userId: userId,
+      characterId: characterId,
+      title: null,
+      characterName: characterName,
+      characterAvatar: characterAvatar,
+    );
+  }
+}
+

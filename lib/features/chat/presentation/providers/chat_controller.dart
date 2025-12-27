@@ -901,18 +901,19 @@ class ChatController extends StateNotifier<ChatState> {
     print('📸 ChatController: Character description: $characterDesc');
     print('📸 ChatController: Full prompt: $fullPrompt');
     print('📸 ChatController: Reference image URL (main_face_image): ${character.avatarUrl}');
-    print('📸 ChatController: Using Flux PuLID for identity preservation');
+    print('📸 ChatController: Using official ByteDance Flux PuLID for identity preservation');
 
-    // Generate image with Flux PuLID for identity preservation
-    // Width/Height optimized for ByteDance Flux PuLID (832x1216 default)
+    // Generate image with official ByteDance Flux PuLID for identity preservation
+    // Width/Height optimized for ByteDance Flux PuLID (832x1216)
+    // Backend will set id_weight=0.85 to allow scenario changes (not frozen pose)
     final params = ImageGenerationParams(
       prompt: fullPrompt,
       referenceImageUrl: character.avatarUrl, // Will be sent as main_face_image to Flux PuLID
       negativePrompt: 'ugly, deformed, noisy, blurry, low quality, distorted face, bad anatomy, watermark, text, logo, different person, face mismatch',
-      width: 832, // ByteDance Flux PuLID optimized size
-      height: 1216,
+      width: 832, // Optimized for ByteDance Flux PuLID
+      height: 1216, // Optimized for ByteDance Flux PuLID
       numOutputs: 1,
-      model: 'flux-pulid', // Use Flux PuLID for identity preservation
+      model: 'flux-pulid', // Official ByteDance Flux PuLID
       guidanceScale: 3.5, // Standard for Flux PuLID
       numInferenceSteps: 20, // Recommended steps for Flux PuLID
     );

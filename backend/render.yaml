@@ -20,3 +20,5 @@ services:
         sync: false  # Set manually in Render dashboard
     healthCheckPath: /health
 
+
+

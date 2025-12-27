@@ -56,20 +56,101 @@ class GeneratedMediaModel extends GeneratedMediaEntity {
     required int width,
     required int height,
   }) {
-    final images = json['images'] as List<dynamic>? ?? [];
+    print('🔵 GeneratedMediaModel: Parsing response json');
+    print('🔵 GeneratedMediaModel: json type: ${json.runtimeType}');
+    print('🔵 GeneratedMediaModel: json keys: ${json.keys.toList()}');
+    print('🔵 GeneratedMediaModel: json values: ${json.values.toList()}');
     
-    return GeneratedMediaModel(
-      id: id,
-      userId: userId,
-      type: MediaType.image,
-      prompt: prompt,
-      imageUrls: images.map((e) => e.toString()).toList(),
-      model: json['model'] ?? model,
-      width: width,
-      height: height,
-      generationTime: (json['generation_time'] as num?)?.toDouble() ?? 0.0,
-      createdAt: DateTime.now(),
-    );
+    // Handle different response formats
+    List<String> imageUrls = [];
+    
+    try {
+      // Try different possible response formats
+      if (json.containsKey('images')) {
+        print('🔵 GeneratedMediaModel: Found "images" key');
+        final images = json['images'];
+        print('🔵 GeneratedMediaModel: images type: ${images.runtimeType}');
+        print('🔵 GeneratedMediaModel: images value: $images');
+        
+        if (images is List) {
+          print('🔵 GeneratedMediaModel: images is List, length: ${images.length}');
+          imageUrls = images.map((e) {
+            print('🔵 GeneratedMediaModel: Processing list item: $e (type: ${e.runtimeType})');
+            return e.toString();
+          }).toList();
+        } else if (images is String) {
+          print('🔵 GeneratedMediaModel: images is String');
+          imageUrls = [images];
+        } else {
+          print('⚠️ GeneratedMediaModel: images is neither List nor String, converting to string');
+          imageUrls = [images.toString()];
+        }
+      } else if (json.containsKey('output')) {
+        print('🔵 GeneratedMediaModel: Found "output" key');
+        final output = json['output'];
+        print('🔵 GeneratedMediaModel: output type: ${output.runtimeType}');
+        print('🔵 GeneratedMediaModel: output value: $output');
+        
+        if (output is List) {
+          print('🔵 GeneratedMediaModel: output is List, length: ${output.length}');
+          imageUrls = output.map((e) {
+            print('🔵 GeneratedMediaModel: Processing list item: $e (type: ${e.runtimeType})');
+            return e.toString();
+          }).toList();
+        } else if (output is String) {
+          print('🔵 GeneratedMediaModel: output is String');
+          imageUrls = [output];
+        } else {
+          print('⚠️ GeneratedMediaModel: output is neither List nor String, converting to string');
+          imageUrls = [output.toString()];
+        }
+      } else if (json.containsKey('image_url')) {
+        print('🔵 GeneratedMediaModel: Found "image_url" key');
+        final imageUrl = json['image_url'];
+        print('🔵 GeneratedMediaModel: image_url type: ${imageUrl.runtimeType}');
+        print('🔵 GeneratedMediaModel: image_url value: $imageUrl');
+        imageUrls = [imageUrl.toString()];
+      } else if (json.containsKey('url')) {
+        print('🔵 GeneratedMediaModel: Found "url" key');
+        final url = json['url'];
+        print('🔵 GeneratedMediaModel: url type: ${url.runtimeType}');
+        print('🔵 GeneratedMediaModel: url value: $url');
+        imageUrls = [url.toString()];
+      } else {
+        print('⚠️ GeneratedMediaModel: No known image key found in json');
+        print('⚠️ GeneratedMediaModel: Available keys: ${json.keys.toList()}');
+      }
+      
+      print('🔵 GeneratedMediaModel: Final imageUrls: $imageUrls');
+      print('🔵 GeneratedMediaModel: imageUrls length: ${imageUrls.length}');
+    } catch (e, stackTrace) {
+      print('❌ GeneratedMediaModel: Error parsing imageUrls: $e');
+      print('❌ GeneratedMediaModel: Stack trace: $stackTrace');
+      print('❌ GeneratedMediaModel: json at error: $json');
+      rethrow;
+    }
+    
+    try {
+      final media = GeneratedMediaModel(
+        id: id,
+        userId: userId,
+        type: MediaType.image,
+        prompt: prompt,
+        imageUrls: imageUrls,
+        model: json['model']?.toString() ?? model,
+        width: width,
+        height: height,
+        generationTime: (json['generation_time'] as num?)?.toDouble() ?? 
+                       (json['generationTime'] as num?)?.toDouble() ?? 0.0,
+        createdAt: DateTime.now(),
+      );
+      print('✅ GeneratedMediaModel: Created successfully');
+      return media;
+    } catch (e, stackTrace) {
+      print('❌ GeneratedMediaModel: Error creating GeneratedMediaModel: $e');
+      print('❌ GeneratedMediaModel: Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   /// Create from Firestore document
@@ -176,4 +257,6 @@ class GeneratedMediaModel extends GeneratedMediaEntity {
     );
   }
 }
+
+
 

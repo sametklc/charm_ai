@@ -82,29 +82,111 @@ class MediaRemoteDataSourceImpl implements MediaRemoteDataSource {
         ),
       );
 
+      print('🔵 MediaRemoteDataSource: Response received');
+      print('🔵 MediaRemoteDataSource: Response statusCode: ${response.statusCode}');
+      print('🔵 MediaRemoteDataSource: Response data type: ${response.data.runtimeType}');
+      print('🔵 MediaRemoteDataSource: Response data: $response.data');
+      
       if (response.statusCode == 200) {
+        
         final mediaId = _uuid.v4();
-        final media = GeneratedMediaModel.fromApiResponse(
-          id: mediaId,
-          userId: userId,
-          json: response.data,
-          prompt: params.prompt,
-          model: params.model,
-          width: params.width,
-          height: params.height,
-        );
+        
+        // Ensure response.data is a Map
+        Map<String, dynamic> responseData;
+        try {
+          if (response.data is Map<String, dynamic>) {
+            responseData = response.data as Map<String, dynamic>;
+            print('🔵 MediaRemoteDataSource: Response is Map<String, dynamic>');
+          } else if (response.data is Map) {
+            responseData = Map<String, dynamic>.from(response.data as Map);
+            print('🔵 MediaRemoteDataSource: Response is Map, converted to Map<String, dynamic>');
+          } else if (response.data is List) {
+            responseData = {'images': response.data};
+            print('🔵 MediaRemoteDataSource: Response is List, wrapped in Map');
+          } else if (response.data is String) {
+            responseData = {'images': [response.data]};
+            print('🔵 MediaRemoteDataSource: Response is String, wrapped in Map');
+          } else {
+            print('⚠️ MediaRemoteDataSource: Unknown response type, creating default Map');
+            responseData = {'images': response.data};
+          }
+        } catch (e, stackTrace) {
+          print('❌ MediaRemoteDataSource: Error processing response.data: $e');
+          print('❌ MediaRemoteDataSource: Stack trace: $stackTrace');
+          print('❌ MediaRemoteDataSource: response.data type: ${response.data.runtimeType}');
+          print('❌ MediaRemoteDataSource: response.data value: $response.data');
+          rethrow;
+        }
+        
+        print('🔵 MediaRemoteDataSource: Processed responseData: $responseData');
+        print('🔵 MediaRemoteDataSource: Calling GeneratedMediaModel.fromApiResponse...');
+        
+        try {
+          final media = GeneratedMediaModel.fromApiResponse(
+            id: mediaId,
+            userId: userId,
+            json: responseData,
+            prompt: params.prompt,
+            model: params.model,
+            width: params.width,
+            height: params.height,
+          );
+          print('✅ MediaRemoteDataSource: GeneratedMediaModel created successfully');
+          print('✅ MediaRemoteDataSource: Media imageUrls: ${media.imageUrls}');
 
-        // Auto-save to Firestore
-        await saveMedia(media);
+          // Auto-save to Firestore (optional - don't fail if this fails)
+          try {
+            print('🔵 MediaRemoteDataSource: Attempting to save media to Firestore...');
+            await saveMedia(media);
+            print('✅ MediaRemoteDataSource: Media saved to Firestore successfully');
+          } catch (e) {
+            print('⚠️ MediaRemoteDataSource: Failed to save media to Firestore (non-critical): $e');
+            // Continue anyway - media saving is optional
+          }
 
-        return media;
+          return media;
+        } catch (e, stackTrace) {
+          print('❌ MediaRemoteDataSource: Error in GeneratedMediaModel.fromApiResponse: $e');
+          print('❌ MediaRemoteDataSource: Stack trace: $stackTrace');
+          print('❌ MediaRemoteDataSource: responseData that caused error: $responseData');
+          rethrow;
+        }
       } else {
+        print('❌ MediaRemoteDataSource: Non-200 status code: ${response.statusCode}');
+        print('❌ MediaRemoteDataSource: Response data type: ${response.data?.runtimeType}');
+        print('❌ MediaRemoteDataSource: Response data: ${response.data}');
+        
+        String errorMessage = 'Failed to generate image';
+        try {
+          if (response.data != null) {
+            if (response.data is Map) {
+              errorMessage = response.data['detail']?.toString() ?? 
+                           response.data['message']?.toString() ?? 
+                           'Failed to generate image';
+            } else if (response.data is String) {
+              errorMessage = response.data as String;
+            } else {
+              errorMessage = response.data.toString();
+            }
+          }
+        } catch (e) {
+          print('❌ MediaRemoteDataSource: Error parsing error response: $e');
+          errorMessage = 'Failed to generate image';
+        }
+        
         throw ServerException(
-          message: response.data?['detail'] ?? 'Failed to generate image',
+          message: errorMessage,
           statusCode: response.statusCode,
         );
       }
     } on DioException catch (e) {
+      print('❌ MediaRemoteDataSource: DioException caught');
+      print('❌ MediaRemoteDataSource: DioException type: ${e.type}');
+      print('❌ MediaRemoteDataSource: DioException message: ${e.message}');
+      print('❌ MediaRemoteDataSource: Response statusCode: ${e.response?.statusCode}');
+      print('❌ MediaRemoteDataSource: Response data type: ${e.response?.data?.runtimeType}');
+      print('❌ MediaRemoteDataSource: Response data: ${e.response?.data}');
+      
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
         throw NetworkException(message: 'Request timed out. Image generation may take a while, please try again.');
@@ -112,19 +194,54 @@ class MediaRemoteDataSourceImpl implements MediaRemoteDataSource {
       if (e.type == DioExceptionType.connectionError) {
         throw NetworkException(message: 'No internet connection');
       }
+      
+      // Safely extract error message
+      String errorMessage = 'Failed to generate image';
+      try {
+        if (e.response?.data != null) {
+          final responseData = e.response!.data;
+          print('🔵 MediaRemoteDataSource: Processing error response data: $responseData');
+          
+          if (responseData is Map) {
+            errorMessage = responseData['detail']?.toString() ?? 
+                         responseData['message']?.toString() ?? 
+                         responseData.toString();
+          } else if (responseData is String) {
+            errorMessage = responseData;
+          } else {
+            errorMessage = responseData.toString();
+          }
+        }
+      } catch (parseError) {
+        print('❌ MediaRemoteDataSource: Error parsing error response: $parseError');
+        errorMessage = e.message ?? 'Failed to generate image';
+      }
+      
+      print('❌ MediaRemoteDataSource: Final error message: $errorMessage');
       throw AIGenerationException(
-        message: e.response?.data?['detail'] ?? 'Failed to generate image',
+        message: errorMessage,
         modelName: params.model,
       );
+    } catch (e, stackTrace) {
+      print('❌ MediaRemoteDataSource: Unexpected error in generateImage: $e');
+      print('❌ MediaRemoteDataSource: Stack trace: $stackTrace');
+      print('❌ MediaRemoteDataSource: Error type: ${e.runtimeType}');
+      rethrow;
     }
   }
 
   @override
   Future<void> saveMedia(GeneratedMediaModel media) async {
+    print('🔵 MediaRemoteDataSource: saveMedia called for mediaId: ${media.id}');
     try {
-      await _mediaCollection.doc(media.id).set(media.toFirestore());
-    } catch (e) {
-      throw ServerException(message: 'Failed to save media');
+      final firestoreData = media.toFirestore();
+      print('🔵 MediaRemoteDataSource: Firestore data prepared: ${firestoreData.keys.join(", ")}');
+      await _mediaCollection.doc(media.id).set(firestoreData);
+      print('✅ MediaRemoteDataSource: Media saved to Firestore successfully');
+    } catch (e, stackTrace) {
+      print('❌ MediaRemoteDataSource: Error saving media: $e');
+      print('Stack trace: $stackTrace');
+      throw ServerException(message: 'Failed to save media: $e');
     }
   }
 

@@ -53,3 +53,5 @@ class AIGenerationException implements Exception {
   String toString() => 'AIGenerationException: $message (Model: $modelName)';
 }
 
+
+

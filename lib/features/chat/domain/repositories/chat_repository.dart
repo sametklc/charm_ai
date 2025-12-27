@@ -40,11 +40,16 @@ abstract class ChatRepository {
   /// Delete conversation
   Future<Either<Failure, void>> deleteConversation(String conversationId);
 
+  /// Delete all conversations for a user
+  Future<Either<Failure, void>> deleteAllUserConversations(String userId);
+
   /// Create new conversation with a character
   Future<Either<Failure, ConversationEntity>> createConversation({
     required String userId,
     required String characterId,
     String? title,
+    String? characterName,
+    String? characterAvatar,
   });
 }
 
